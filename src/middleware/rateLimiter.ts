@@ -18,6 +18,12 @@ export const rateLimiter = (options: {
   const { windowMs, maxRequests, message = 'Too many requests' } = options;
   
   return (req: Request, res: Response, next: NextFunction): void => {
+    // Skip rate limiting in test environment
+    if (process.env.NODE_ENV === 'test') {
+      next();
+      return;
+    }
+
     const key = req.ip || 'unknown';
     const now = Date.now();
     

@@ -18,10 +18,11 @@ router.get('/profile', async (req: Request, res: Response): Promise<void> => {
     const result = await PlayerService.getPlayerProfile(playerId);
 
     if (!result.success) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -48,19 +49,21 @@ router.put('/profile', rateLimiter({ maxRequests: 10, windowMs: 15 * 60 * 1000 }
 
     // Validate request body
     if (!updateData || (updateData.username === undefined && updateData.avatar === undefined)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'At least one field (username or avatar) must be provided'
       });
+      return;
     }
 
     const result = await PlayerService.updatePlayerProfile(playerId, updateData);
 
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -87,10 +90,11 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     const result = await PlayerService.getPlayerStatistics(playerId);
 
     if (!result.success) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -116,20 +120,22 @@ router.get('/search', rateLimiter({ maxRequests: 20, windowMs: 60 * 1000 }), asy
     const playerId = req.userId!;
 
     if (!query || typeof query !== 'string') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Search query is required'
       });
+      return;
     }
 
     const searchLimit = limit ? Math.min(parseInt(limit as string, 10), 50) : 10;
     const result = await PlayerService.searchPlayers(query, playerId, searchLimit);
 
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -155,10 +161,11 @@ router.get('/friends', async (req: Request, res: Response): Promise<void> => {
     const result = await PlayerService.getFriendsList(playerId);
 
     if (!result.success) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -184,19 +191,21 @@ router.post('/friends', rateLimiter({ maxRequests: 10, windowMs: 60 * 1000 }), a
     const { friendId } = req.body;
 
     if (!friendId || typeof friendId !== 'string') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Friend ID is required'
       });
+      return;
     }
 
     const result = await PlayerService.addFriend(playerId, friendId);
 
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.status(201).json({
@@ -222,19 +231,21 @@ router.delete('/friends/:friendId', rateLimiter({ maxRequests: 10, windowMs: 60 
     const { friendId } = req.params;
 
     if (!friendId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Friend ID is required'
       });
+      return;
     }
 
     const result = await PlayerService.removeFriend(playerId, friendId);
 
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -262,10 +273,11 @@ router.get('/leaderboard', async (req: Request, res: Response): Promise<void> =>
     const result = await PlayerService.getLeaderboard(leaderboardLimit);
 
     if (!result.success) {
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({
@@ -291,10 +303,11 @@ router.post('/activity', async (req: Request, res: Response): Promise<void> => {
     const result = await PlayerService.updateLastActive(playerId);
 
     if (!result.success) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: result.message
       });
+      return;
     }
 
     res.json({

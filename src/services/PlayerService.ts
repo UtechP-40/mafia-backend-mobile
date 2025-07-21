@@ -110,7 +110,7 @@ export class PlayerService {
       }
 
       return { success: true, data: updatedPlayer };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update player profile error:', error);
       if (error.code === 11000) {
         return { success: false, message: 'Username already taken' };
@@ -260,8 +260,12 @@ export class PlayerService {
       }
 
       // Add friend to both players
-      player.addFriend(friendObjectId);
-      friend.addFriend(new Types.ObjectId(playerId));
+      if (!player.friends.includes(friendObjectId)) {
+        player.friends.push(friendObjectId);
+      }
+      if (!friend.friends.includes(new Types.ObjectId(playerId))) {
+        friend.friends.push(new Types.ObjectId(playerId));
+      }
 
       await Promise.all([player.save(), friend.save()]);
 
@@ -297,8 +301,8 @@ export class PlayerService {
       const friendObjectId = new Types.ObjectId(friendId);
       const playerObjectId = new Types.ObjectId(playerId);
 
-      player.removeFriend(friendObjectId);
-      friend.removeFriend(playerObjectId);
+      player.friends = player.friends.filter((id: any) => !id.equals(friendObjectId));
+      friend.friends = friend.friends.filter((id: any) => !id.equals(playerObjectId));
 
       await Promise.all([player.save(), friend.save()]);
 
