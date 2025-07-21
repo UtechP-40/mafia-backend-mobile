@@ -11,6 +11,7 @@ import { authRoutes } from './api/auth';
 import { playerRoutes } from './api/players';
 import { roomRoutes } from './api/rooms';
 import { gameRoutes } from './api/games';
+import { SocketService } from './services/SocketService';
 
 // Load environment variables
 dotenv.config();
@@ -47,14 +48,13 @@ app.use('/api/players', playerRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/games', gameRoutes);
 
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-});
+// Initialize Socket.io service
+const socketService = new SocketService(io);
+
+// Set up session cleanup interval (every 5 minutes)
+setInterval(() => {
+  socketService.cleanupInactiveSessions(30); // 30 minute timeout
+}, 5 * 60 * 1000);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
@@ -75,4 +75,4 @@ async function startServer() {
 
 startServer();
 
-export { app, server, io };
+export { app, server, io, socketService };
