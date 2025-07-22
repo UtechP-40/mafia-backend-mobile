@@ -11,33 +11,35 @@ import { gameRoutes } from '../api/games';
 
 let mongoServer: MongoMemoryServer;
 
-beforeAll(async () => {
-  // Start in-memory MongoDB instance
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  
-  // Connect to the in-memory database
-  await mongoose.connect(mongoUri);
-});
+export const connectDB = async (): Promise<void> => {
+  // Only connect if not already connected
+  if (mongoose.connection.readyState === 0) {
+    // Start in-memory MongoDB instance
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    
+    // Connect to the in-memory database
+    await mongoose.connect(mongoUri);
+  }
+};
 
-afterAll(async () => {
+export const disconnectDB = async (): Promise<void> => {
   // Clean up and close connections
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
   await mongoServer.stop();
-});
+};
 
-afterEach(async () => {
+export const clearDB = async (): Promise<void> => {
   // Clean up collections after each test
   const collections = mongoose.connection.collections;
   for (const key in collections) {
     const collection = collections[key];
     await collection.deleteMany({});
   }
-  
-  // Clear any rate limiting state
-  jest.clearAllTimers();
-});
+};
+
+// Global setup removed - each test file should handle its own setup
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';

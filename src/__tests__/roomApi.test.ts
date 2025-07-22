@@ -48,20 +48,20 @@ describe('Room API Endpoints', () => {
 
     // Generate auth tokens
     authToken1 = jwt.sign(
-      { id: testPlayer1._id.toString(), username: testPlayer1.username },
-      process.env.JWT_SECRET || 'test-secret',
+      { userId: testPlayer1._id.toString(), username: testPlayer1.username },
+      process.env.JWT_ACCESS_SECRET || 'test-access-secret',
       { expiresIn: '1h' }
     );
 
     authToken2 = jwt.sign(
-      { id: testPlayer2._id.toString(), username: testPlayer2.username },
-      process.env.JWT_SECRET || 'test-secret',
+      { userId: testPlayer2._id.toString(), username: testPlayer2.username },
+      process.env.JWT_ACCESS_SECRET || 'test-access-secret',
       { expiresIn: '1h' }
     );
 
     authToken3 = jwt.sign(
-      { id: testPlayer3._id.toString(), username: testPlayer3.username },
-      process.env.JWT_SECRET || 'test-secret',
+      { userId: testPlayer3._id.toString(), username: testPlayer3.username },
+      process.env.JWT_ACCESS_SECRET || 'test-access-secret',
       { expiresIn: '1h' }
     );
   });
@@ -91,8 +91,12 @@ describe('Room API Endpoints', () => {
         isPublic: false,
         maxPlayers: 12,
         gameSettings: {
+          maxPlayers: 12,
           enableVoiceChat: false,
-          dayPhaseDuration: 600000
+          dayPhaseDuration: 600000,
+          nightPhaseDuration: 120000,
+          votingDuration: 60000,
+          roles: []
         },
         allowSpectators: true,
         requireInvite: true
@@ -138,13 +142,20 @@ describe('Room API Endpoints', () => {
     beforeEach(async () => {
       // Create test rooms
       await Room.create({
-        code: 'PUBLIC1',
+        code: 'PUB001',
         hostId: testPlayer1._id,
         players: [testPlayer1._id],
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: { enableVoiceChat: true },
+          gameSettings: { 
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -152,13 +163,20 @@ describe('Room API Endpoints', () => {
       });
 
       await Room.create({
-        code: 'PUBLIC2',
+        code: 'PUB002',
         hostId: testPlayer2._id,
         players: [testPlayer2._id],
         settings: {
           isPublic: true,
           maxPlayers: 12,
-          gameSettings: { enableVoiceChat: false },
+          gameSettings: { 
+            maxPlayers: 12,
+            enableVoiceChat: false,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: true,
           requireInvite: false
         },
@@ -166,13 +184,20 @@ describe('Room API Endpoints', () => {
       });
 
       await Room.create({
-        code: 'PRIVATE',
+        code: 'PRIV01',
         hostId: testPlayer3._id,
         players: [testPlayer3._id],
         settings: {
           isPublic: false,
           maxPlayers: 6,
-          gameSettings: { enableVoiceChat: true },
+          gameSettings: { 
+            maxPlayers: 6,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: true
         },
@@ -239,7 +264,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -309,7 +341,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -354,7 +393,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -420,7 +466,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -475,7 +528,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },
@@ -494,7 +554,7 @@ describe('Room API Endpoints', () => {
 
     it('should handle non-existent room', async () => {
       const response = await request(app)
-        .get('/api/rooms/code/NONEXIST');
+        .get('/api/rooms/code/NONE01');
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -519,7 +579,14 @@ describe('Room API Endpoints', () => {
         settings: {
           isPublic: true,
           maxPlayers: 8,
-          gameSettings: {},
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          },
           allowSpectators: false,
           requireInvite: false
         },

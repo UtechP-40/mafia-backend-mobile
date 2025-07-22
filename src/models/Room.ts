@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from 'mongoose';
+import { Schema, model, Document, Types, Model } from 'mongoose';
 import { GameRole } from './Player';
 
 // Enums and interfaces
@@ -41,6 +41,22 @@ export interface IRoom extends Document {
   gameStateId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  
+  // Virtual properties
+  currentPlayerCount: number;
+  isFull: boolean;
+  canStart: boolean;
+  
+  // Instance methods
+  addPlayer(playerId: Types.ObjectId): boolean;
+  removePlayer(playerId: Types.ObjectId): boolean;
+  transferHost(newHostId: Types.ObjectId): boolean;
+  generateCode(): void;
+}
+
+export interface IRoomModel extends Model<IRoom> {
+  findPublicRooms(limit?: number, skip?: number): Promise<IRoom[]>;
+  findByCode(code: string): Promise<IRoom | null>;
 }
 
 // Role configuration sub-schema
@@ -233,4 +249,4 @@ RoomSchema.statics.findByCode = function(code: string) {
     .populate('players', 'username avatar');
 };
 
-export const Room = model<IRoom>('Room', RoomSchema);
+export const Room = model<IRoom, IRoomModel>('Room', RoomSchema);

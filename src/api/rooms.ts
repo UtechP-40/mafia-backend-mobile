@@ -18,7 +18,7 @@ const isValidRoomCode = (code: string): boolean => {
 /**
  * GET /api/rooms/public - Get public rooms with filtering and pagination
  */
-router.get('/public', async (req: Request, res: Response) => {
+router.get('/public', async (req: Request, res: Response): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -52,9 +52,9 @@ router.get('/public', async (req: Request, res: Response) => {
 /**
  * POST /api/rooms - Create a new room
  */
-router.post('/', authenticateToken, async (req: Request, res: Response) => {
+router.post('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const hostId = req.user!.id;
+    const hostId = req.user!._id.toString();
     const settings = req.body.settings || {};
 
     const room = await roomManager.createRoom({ hostId, settings });
@@ -76,10 +76,18 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 /**
  * POST /api/rooms/join - Join a room by code or ID
  */
-router.post('/join', authMiddleware, joinRoomValidation, validateRequest, async (req: Request, res: Response) => {
+router.post('/join', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const playerId = req.user!.id;
+    const playerId = req.user!._id.toString();
     const { roomIdentifier } = req.body;
+
+    if (!roomIdentifier || typeof roomIdentifier !== 'string' || roomIdentifier.trim() === '') {
+      res.status(400).json({
+        success: false,
+        message: 'Room identifier is required'
+      });
+      return;
+    }
 
     const result = await roomManager.joinRoom(roomIdentifier, playerId);
 
@@ -107,10 +115,18 @@ router.post('/join', authMiddleware, joinRoomValidation, validateRequest, async 
 /**
  * POST /api/rooms/:roomId/leave - Leave a room
  */
-router.post('/:roomId/leave', authMiddleware, [param('roomId').isMongoId()], validateRequest, async (req: Request, res: Response) => {
+router.post('/:roomId/leave', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const playerId = req.user!.id;
+    const playerId = req.user!._id.toString();
     const { roomId } = req.params;
+
+    if (!isValidObjectId(roomId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid room ID'
+      });
+      return;
+    }
 
     const success = await roomManager.leaveRoom(roomId, playerId);
 
@@ -137,11 +153,19 @@ router.post('/:roomId/leave', authMiddleware, [param('roomId').isMongoId()], val
 /**
  * PUT /api/rooms/:roomId/settings - Update room settings (host only)
  */
-router.put('/:roomId/settings', authMiddleware, updateRoomValidation, validateRequest, async (req: Request, res: Response) => {
+router.put('/:roomId/settings', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const hostId = req.user!.id;
+    const hostId = req.user!._id.toString();
     const { roomId } = req.params;
     const settings = req.body.settings;
+
+    if (!isValidObjectId(roomId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid room ID'
+      });
+      return;
+    }
 
     const room = await roomManager.updateRoomSettings(roomId, hostId, settings);
 
@@ -169,9 +193,18 @@ router.put('/:roomId/settings', authMiddleware, updateRoomValidation, validateRe
 /**
  * GET /api/rooms/:roomId - Get room details
  */
-router.get('/:roomId', authMiddleware, [param('roomId').isMongoId()], validateRequest, async (req: Request, res: Response) => {
+router.get('/:roomId', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const { roomId } = req.params;
+
+    if (!isValidObjectId(roomId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid room ID'
+      });
+      return;
+    }
+
     const room = await roomManager.getRoomById(roomId);
 
     if (room) {
@@ -197,9 +230,18 @@ router.get('/:roomId', authMiddleware, [param('roomId').isMongoId()], validateRe
 /**
  * GET /api/rooms/code/:code - Get room by code
  */
-router.get('/code/:code', [param('code').matches(/^[A-Z0-9]{6}$/)], validateRequest, async (req: Request, res: Response) => {
+router.get('/code/:code', async (req: Request, res: Response): Promise<void> => {
   try {
     const { code } = req.params;
+
+    if (!isValidRoomCode(code)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid room code format'
+      });
+      return;
+    }
+
     const room = await roomManager.getRoomByCode(code);
 
     if (room) {
@@ -225,14 +267,27 @@ router.get('/code/:code', [param('code').matches(/^[A-Z0-9]{6}$/)], validateRequ
 /**
  * POST /api/rooms/:roomId/transfer-host - Transfer host privileges
  */
-router.post('/:roomId/transfer-host', authMiddleware, [
-  param('roomId').isMongoId(),
-  body('newHostId').isMongoId()
-], validateRequest, async (req: Request, res: Response) => {
+router.post('/:roomId/transfer-host', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const currentHostId = req.user!.id;
+    const currentHostId = req.user!._id.toString();
     const { roomId } = req.params;
     const { newHostId } = req.body;
+
+    if (!isValidObjectId(roomId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid room ID'
+      });
+      return;
+    }
+
+    if (!newHostId || !isValidObjectId(newHostId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid new host ID'
+      });
+      return;
+    }
 
     const success = await roomManager.transferHost(roomId, currentHostId, newHostId);
 

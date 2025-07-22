@@ -57,9 +57,9 @@ describe('RoomManager', () => {
 
       expect(room).toBeDefined();
       expect(room.code).toMatch(/^[A-Z0-9]{6}$/);
-      expect(room.hostId.toString()).toBe(testPlayer1._id.toString());
+      expect(room.hostId._id.toString()).toBe(testPlayer1._id.toString());
       expect(room.players).toHaveLength(1);
-      expect(room.players[0].toString()).toBe(testPlayer1._id.toString());
+      expect(room.players[0]._id.toString()).toBe(testPlayer1._id.toString());
       expect(room.status).toBe(RoomStatus.WAITING);
       expect(room.settings.isPublic).toBe(true);
       expect(room.settings.maxPlayers).toBe(8);
@@ -70,8 +70,12 @@ describe('RoomManager', () => {
         isPublic: false,
         maxPlayers: 12,
         gameSettings: {
+          maxPlayers: 12,
           enableVoiceChat: false,
-          dayPhaseDuration: 600000
+          dayPhaseDuration: 600000,
+          nightPhaseDuration: 120000,
+          votingDuration: 60000,
+          roles: []
         },
         allowSpectators: true,
         requireInvite: true
@@ -147,12 +151,30 @@ describe('RoomManager', () => {
     });
 
     it('should not allow joining full room', async () => {
-      // Set room to max 2 players and fill it
-      testRoom.settings.maxPlayers = 2;
+      // Set room to max 4 players and fill it
+      testRoom.settings.maxPlayers = 4;
       testRoom.players.push(testPlayer2._id);
+      testRoom.players.push(testPlayer3._id);
+      
+      // Create a fourth player to fill the room
+      const testPlayer4 = await Player.create({
+        username: 'testplayer4',
+        email: 'player4@test.com',
+        passwordHash: 'hashedpassword',
+        avatar: 'avatar4.png'
+      });
+      testRoom.players.push(testPlayer4._id);
       await testRoom.save();
 
-      const result = await roomManager.joinRoom(testRoom.code, testPlayer3._id.toString());
+      // Try to add a fifth player
+      const testPlayer5 = await Player.create({
+        username: 'testplayer5',
+        email: 'player5@test.com',
+        passwordHash: 'hashedpassword',
+        avatar: 'avatar5.png'
+      });
+
+      const result = await roomManager.joinRoom(testRoom.code, testPlayer5._id.toString());
 
       expect(result.success).toBe(false);
       expect(result.message).toBe('Room is full');
@@ -338,7 +360,18 @@ describe('RoomManager', () => {
 
       await roomManager.createRoom({
         hostId: testPlayer2._id.toString(),
-        settings: { isPublic: true, maxPlayers: 12, gameSettings: { enableVoiceChat: false } }
+        settings: { 
+          isPublic: true, 
+          maxPlayers: 12, 
+          gameSettings: { 
+            maxPlayers: 12,
+            enableVoiceChat: false,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          } 
+        }
       });
 
       await roomManager.createRoom({
@@ -447,7 +480,20 @@ describe('RoomManager', () => {
         code: 'CANCEL',
         hostId: testPlayer1._id,
         players: [],
-        settings: { isPublic: true, maxPlayers: 8, gameSettings: {}, allowSpectators: false, requireInvite: false },
+        settings: { 
+          isPublic: true, 
+          maxPlayers: 8, 
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          }, 
+          allowSpectators: false, 
+          requireInvite: false 
+        },
         status: RoomStatus.CANCELLED,
         createdAt: oldDate,
         updatedAt: oldDate
@@ -457,7 +503,20 @@ describe('RoomManager', () => {
         code: 'FINISH',
         hostId: testPlayer2._id,
         players: [],
-        settings: { isPublic: true, maxPlayers: 8, gameSettings: {}, allowSpectators: false, requireInvite: false },
+        settings: { 
+          isPublic: true, 
+          maxPlayers: 8, 
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          }, 
+          allowSpectators: false, 
+          requireInvite: false 
+        },
         status: RoomStatus.FINISHED,
         createdAt: oldDate,
         updatedAt: oldDate
@@ -467,7 +526,20 @@ describe('RoomManager', () => {
         code: 'WAIT01',
         hostId: testPlayer3._id,
         players: [testPlayer3._id],
-        settings: { isPublic: true, maxPlayers: 8, gameSettings: {}, allowSpectators: false, requireInvite: false },
+        settings: { 
+          isPublic: true, 
+          maxPlayers: 8, 
+          gameSettings: {
+            maxPlayers: 8,
+            enableVoiceChat: true,
+            dayPhaseDuration: 300000,
+            nightPhaseDuration: 120000,
+            votingDuration: 60000,
+            roles: []
+          }, 
+          allowSpectators: false, 
+          requireInvite: false 
+        },
         status: RoomStatus.WAITING,
         createdAt: oldDate,
         updatedAt: oldDate
