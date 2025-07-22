@@ -51,7 +51,7 @@ export class SocketService {
         return next(new Error('Authentication token required'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET!) as any;
       const player = await Player.findById(decoded.playerId);
       
       if (!player) {
@@ -155,7 +155,7 @@ export class SocketService {
         this.roomStates.set(roomId, {
           roomId,
           players: new Map(),
-          host: room.hostId
+          host: room.hostId.toString()
         });
       }
 
@@ -197,9 +197,9 @@ export class SocketService {
         room.players = room.players.filter(p => p._id.toString() !== playerId);
         
         // If host left, transfer to another player or delete room
-        if (room.hostId === playerId) {
+        if (room.hostId.toString() === playerId) {
           if (room.players.length > 0) {
-            room.hostId = room.players[0]._id.toString();
+            room.hostId = room.players[0]._id;
           } else {
             await Room.findByIdAndDelete(roomId);
             this.roomStates.delete(roomId);
@@ -227,7 +227,7 @@ export class SocketService {
         if (roomState.players.size === 0) {
           this.roomStates.delete(roomId);
         } else if (roomState.host === playerId && room) {
-          roomState.host = room.hostId;
+          roomState.host = room.hostId.toString();
         }
       }
 
@@ -257,7 +257,7 @@ export class SocketService {
       }
 
       const room = await Room.findById(session.roomId);
-      if (!room || room.hostId !== playerId) {
+      if (!room || room.hostId.toString() !== playerId) {
         socket.emit('error', { message: 'Only host can update room settings' });
         return;
       }
@@ -300,8 +300,8 @@ export class SocketService {
 
       await chatMessage.save();
 
-      // Broadcast to room
-      this.io.to(session.roomId).emit('chat-message', {
+      // Broadcast to room (including sender)
+      this.io.of('/game').to(session.roomId).emit('chat-message', {
         id: chatMessage._id,
         playerId,
         playerName: socket.player.username,

@@ -2,4 +2,5 @@
 export * from './AuthService';
 export * from './GameService';
 export * from './PlayerService';
+export * from './RoomService';
 export * from './SocketService';

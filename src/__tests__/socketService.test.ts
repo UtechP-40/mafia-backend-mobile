@@ -6,7 +6,6 @@ import { SocketService } from '../services/SocketService';
 import { Player } from '../models/Player';
 import { Room } from '../models/Room';
 import { ChatMessage } from '../models/ChatMessage';
-import { connectDatabase, disconnectDatabase } from '../utils/database';
 
 // Type definitions for test data
 interface TestData {
@@ -37,8 +36,6 @@ describe('SocketService', () => {
   let authToken: string;
 
   beforeAll(async () => {
-    await connectDatabase();
-    
     // Create HTTP server and Socket.io instance
     httpServer = createServer();
     io = new Server(httpServer, {
@@ -81,18 +78,18 @@ describe('SocketService', () => {
     
     // Create test room
     testRoom = new Room({
-      code: 'TEST123',
+      code: 'TEST12',
       hostId: testPlayer._id,
-      players: [testPlayer],
+      players: [], // Start with empty players array
       settings: {
         isPublic: true,
         maxPlayers: 8,
         gameSettings: {
           maxPlayers: 8,
           enableVoiceChat: true,
-          dayPhaseDuration: 300,
-          nightPhaseDuration: 180,
-          votingDuration: 60,
+          dayPhaseDuration: 300000, // 5 minutes in milliseconds
+          nightPhaseDuration: 120000, // 2 minutes in milliseconds
+          votingDuration: 60000, // 1 minute in milliseconds
           roles: []
         },
         allowSpectators: false,
@@ -105,7 +102,7 @@ describe('SocketService', () => {
     // Generate auth token
     authToken = jwt.sign(
       { playerId: testPlayer._id },
-      process.env.JWT_SECRET || 'test-secret'
+      process.env.JWT_ACCESS_SECRET || 'test-access-secret'
     );
   });
 
@@ -116,9 +113,12 @@ describe('SocketService', () => {
   });
 
   afterAll(async () => {
-    await disconnectDatabase();
-    io.close();
-    httpServer.close();
+    if (io) {
+      io.close();
+    }
+    if (httpServer) {
+      httpServer.close();
+    }
   });
 
   const connectClient = (token: string = authToken): Promise<ClientSocket> => {
@@ -152,7 +152,7 @@ describe('SocketService', () => {
     it('should reject token for non-existent player', async () => {
       const fakeToken = jwt.sign(
         { playerId: '507f1f77bcf86cd799439011' },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       await expect(connectClient(fakeToken)).rejects.toThrow();
     });
@@ -178,7 +178,7 @@ describe('SocketService', () => {
       // Connect second client
       const secondToken = jwt.sign(
         { playerId: testPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       connectClient(secondToken).then((secondClient) => {
@@ -191,7 +191,7 @@ describe('SocketService', () => {
         });
         
         // First client should receive notification
-        clientSocket.on('player-joined', (data) => {
+        clientSocket.on('player-joined', (data: TestData) => {
           expect(data.player).toBeDefined();
           expect(data.roomState).toBeDefined();
           secondClient.disconnect();
@@ -203,7 +203,7 @@ describe('SocketService', () => {
     it('should prevent joining non-existent room', (done) => {
       clientSocket.emit('join-room', { roomId: '507f1f77bcf86cd799439011' });
       
-      clientSocket.on('error', (error) => {
+      clientSocket.on('error', (error: any) => {
         expect(error.message).toBe('Room not found');
         done();
       });
@@ -216,7 +216,7 @@ describe('SocketService', () => {
         clientSocket.emit('leave-room', { roomId: testRoom._id.toString() });
       });
       
-      clientSocket.on('room-left', (data) => {
+      clientSocket.on('room-left', (data: TestData) => {
         expect(data.roomId).toBe(testRoom._id.toString());
         done();
       });
@@ -225,7 +225,7 @@ describe('SocketService', () => {
     it('should broadcast when player leaves room', (done) => {
       const secondToken = jwt.sign(
         { playerId: testPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       connectClient(secondToken).then((secondClient) => {
@@ -242,7 +242,7 @@ describe('SocketService', () => {
         });
         
         // Second client should receive notification
-        secondClient.on('player-left', (data) => {
+        secondClient.on('player-left', (data: TestData) => {
           expect(data.playerId).toBe(testPlayer._id.toString());
           expect(data.roomState).toBeDefined();
           secondClient.disconnect();
@@ -267,7 +267,7 @@ describe('SocketService', () => {
       
       clientSocket.emit('chat-message', { content: message });
       
-      clientSocket.on('chat-message', (data) => {
+      clientSocket.on('chat-message', (data: TestData) => {
         expect(data.content).toBe(message);
         expect(data.playerId).toBe(testPlayer._id.toString());
         expect(data.playerName).toBe(testPlayer.username);
@@ -287,8 +287,10 @@ describe('SocketService', () => {
       
       const savedMessage = await ChatMessage.findOne({ content: message });
       expect(savedMessage).toBeTruthy();
-      expect(savedMessage!.playerId.toString()).toBe(testPlayer._id.toString());
-      expect(savedMessage!.roomId.toString()).toBe(testRoom._id.toString());
+      if (savedMessage) {
+        expect(savedMessage.playerId?.toString()).toBe(testPlayer._id.toString());
+        expect(savedMessage.roomId.toString()).toBe(testRoom._id.toString());
+      }
     });
 
     it('should prevent chat when not in room', (done) => {
@@ -298,7 +300,7 @@ describe('SocketService', () => {
       connectClient().then((newClient) => {
         newClient.emit('chat-message', { content: 'Should fail' });
         
-        newClient.on('error', (error) => {
+        newClient.on('error', (error: any) => {
           expect(error.message).toBe('Not in a room');
           newClient.disconnect();
           done();
@@ -320,7 +322,7 @@ describe('SocketService', () => {
     it('should update and broadcast ready state', (done) => {
       const secondToken = jwt.sign(
         { playerId: testPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       connectClient(secondToken).then((secondClient) => {
@@ -330,7 +332,7 @@ describe('SocketService', () => {
           clientSocket.emit('ready-state-change', { isReady: true });
         });
         
-        secondClient.on('player-ready-state-changed', (data) => {
+        secondClient.on('player-ready-state-changed', (data: TestData) => {
           expect(data.playerId).toBe(testPlayer._id.toString());
           expect(data.isReady).toBe(true);
           secondClient.disconnect();
@@ -353,7 +355,7 @@ describe('SocketService', () => {
     it('should broadcast voice state changes', (done) => {
       const secondToken = jwt.sign(
         { playerId: testPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       connectClient(secondToken).then((secondClient) => {
@@ -367,7 +369,7 @@ describe('SocketService', () => {
           });
         });
         
-        secondClient.on('voice-state-changed', (data) => {
+        secondClient.on('voice-state-changed', (data: TestData) => {
           expect(data.playerId).toBe(testPlayer._id.toString());
           expect(data.isMuted).toBe(false);
           expect(data.isSpeaking).toBe(true);
@@ -387,7 +389,7 @@ describe('SocketService', () => {
     it('should respond to ping with pong', (done) => {
       clientSocket.emit('ping');
       
-      clientSocket.on('pong', (data) => {
+      clientSocket.on('pong', (data: TestData) => {
         expect(data.timestamp).toBeDefined();
         expect(typeof data.timestamp).toBe('number');
         done();
@@ -415,7 +417,7 @@ describe('SocketService', () => {
     it('should broadcast disconnection to room', (done) => {
       const secondToken = jwt.sign(
         { playerId: testPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       connectClient(secondToken).then((secondClient) => {
@@ -431,7 +433,7 @@ describe('SocketService', () => {
           clientSocket.disconnect();
         });
         
-        secondClient.on('player-disconnected', (data) => {
+        secondClient.on('player-disconnected', (data: TestData) => {
           expect(data.playerId).toBe(testPlayer._id.toString());
           expect(data.timestamp).toBeDefined();
           secondClient.disconnect();
@@ -459,7 +461,7 @@ describe('SocketService', () => {
       
       clientSocket.emit('room-settings-update', { settings: newSettings });
       
-      clientSocket.on('room-settings-updated', (data) => {
+      clientSocket.on('room-settings-updated', (data: TestData) => {
         expect(data.settings.maxPlayers).toBe(6);
         expect(data.settings.enableVoiceChat).toBe(false);
         done();
@@ -485,7 +487,7 @@ describe('SocketService', () => {
       
       const otherToken = jwt.sign(
         { playerId: otherPlayer._id },
-        process.env.JWT_SECRET || 'test-secret'
+        process.env.JWT_ACCESS_SECRET || 'test-access-secret'
       );
       
       const otherClient = await connectClient(otherToken);
@@ -498,7 +500,7 @@ describe('SocketService', () => {
       await new Promise<void>((resolve) => {
         otherClient.emit('room-settings-update', { settings: { maxPlayers: 4 } });
         
-        otherClient.on('error', (error) => {
+        otherClient.on('error', (error: any) => {
           expect(error.message).toBe('Only host can update room settings');
           otherClient.disconnect();
           resolve();
@@ -539,7 +541,7 @@ describe('SocketService', () => {
     it('should broadcast to room', (done) => {
       socketService.broadcastToRoom(testRoom._id.toString(), 'test-event', { message: 'test' });
       
-      clientSocket.on('test-event', (data) => {
+      clientSocket.on('test-event', (data: TestData) => {
         expect(data.message).toBe('test');
         done();
       });
@@ -548,7 +550,7 @@ describe('SocketService', () => {
     it('should send to specific player', (done) => {
       socketService.sendToPlayer(testPlayer._id.toString(), 'test-player-event', { message: 'player-test' });
       
-      clientSocket.on('test-player-event', (data) => {
+      clientSocket.on('test-player-event', (data: TestData) => {
         expect(data.message).toBe('player-test');
         done();
       });
