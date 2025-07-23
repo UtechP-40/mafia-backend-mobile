@@ -7,13 +7,22 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { connectDatabase } from './utils/database';
 import { errorHandler } from './middleware/errorHandler';
+import { 
+  analyticsMiddleware, 
+  requestTrackingMiddleware, 
+  performanceTrackingMiddleware,
+  errorTrackingMiddleware,
+  sessionTrackingMiddleware 
+} from './middleware/analyticsMiddleware';
 import { authRoutes } from './api/auth';
 import { playerRoutes } from './api/players';
 import { roomRoutes } from './api/rooms';
 import { gameRoutes } from './api/games';
 import matchmakingRoutes from './api/matchmaking';
 import aiRoutes from './api/ai';
+import analyticsRoutes from './api/analytics';
 import { SocketService } from './services/SocketService';
+import { analyticsService } from './services/AnalyticsService';
 
 // Load environment variables
 dotenv.config();
