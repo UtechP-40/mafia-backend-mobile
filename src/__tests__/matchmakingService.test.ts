@@ -2,6 +2,7 @@ import { MatchmakingService, MatchmakingPreferences } from '../services/Matchmak
 import { Player } from '../models/Player';
 import { RoomService } from '../services/RoomService';
 import { connectDatabase, disconnectDatabase } from '../utils/database';
+import { Types } from 'mongoose';
 
 // Mock the RoomService
 jest.mock('../services/RoomService');
@@ -250,11 +251,11 @@ describe('MatchmakingService', () => {
 
       for (let i = 0; i < 3; i++) {
         const usPlayer = new Player({
-          username: `us-player${i}`,
+          username: `usplayer${i}`,
           statistics: { eloRating: 1200, gamesPlayed: 10, gamesWon: 5 }
         });
         const euPlayer = new Player({
-          username: `eu-player${i}`,
+          username: `euplayer${i}`,
           statistics: { eloRating: 1200, gamesPlayed: 10, gamesWon: 5 }
         });
         
@@ -479,8 +480,8 @@ describe('MatchmakingService', () => {
       
       // Verify the room was created with appropriate settings
       const createRoomCall = mockRoomService.createRoom.mock.calls[0][0];
-      expect(createRoomCall.settings.gameSettings.maxPlayers).toBe(4);
-      expect(createRoomCall.settings.gameSettings.roles).toBeDefined();
+      expect(createRoomCall.settings.gameSettings?.maxPlayers).toBe(4);
+      expect(createRoomCall.settings.gameSettings?.roles).toBeDefined();
     });
   });
 

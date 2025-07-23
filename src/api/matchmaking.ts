@@ -1,18 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { MatchmakingService, MatchmakingPreferences } from '../services/MatchmakingService';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { authenticateToken } from '../middleware/authMiddleware';
 import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 const matchmakingService = MatchmakingService.getInstance();
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 // Apply rate limiting to prevent abuse
 router.use(rateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute
+  maxRequests: 30, // 30 requests per minute
   message: 'Too many matchmaking requests, please try again later'
 }));
 
@@ -22,7 +22,7 @@ router.use(rateLimiter({
  */
 router.post('/join', async (req: Request, res: Response) => {
   try {
-    const playerId = req.user?.id;
+    const playerId = req.userId;
     if (!playerId) {
       return res.status(401).json({ 
         success: false, 
@@ -75,13 +75,13 @@ router.post('/join', async (req: Request, res: Response) => {
     );
 
     if (result.success) {
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } else {
-      res.status(400).json(result);
+      return res.status(400).json(result);
     }
   } catch (error) {
     console.error('Join matchmaking queue error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
@@ -94,7 +94,7 @@ router.post('/join', async (req: Request, res: Response) => {
  */
 router.post('/leave', async (req: Request, res: Response) => {
   try {
-    const playerId = req.user?.id;
+    const playerId = req.userId;
     if (!playerId) {
       return res.status(401).json({ 
         success: false, 
@@ -104,13 +104,13 @@ router.post('/leave', async (req: Request, res: Response) => {
 
     const success = matchmakingService.leaveQueue(playerId);
 
-    res.status(200).json({
+    return res.status(200).json({
       success,
       message: success ? 'Successfully left matchmaking queue' : 'Player was not in queue'
     });
   } catch (error) {
     console.error('Leave matchmaking queue error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
@@ -123,7 +123,7 @@ router.post('/leave', async (req: Request, res: Response) => {
  */
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const playerId = req.user?.id;
+    const playerId = req.userId;
     if (!playerId) {
       return res.status(401).json({ 
         success: false, 
@@ -134,19 +134,19 @@ router.get('/status', async (req: Request, res: Response) => {
     const queueStatus = matchmakingService.getQueueStatus(playerId);
 
     if (queueStatus) {
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: queueStatus
       });
     } else {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: 'Player not in matchmaking queue'
       });
     }
   } catch (error) {
     console.error('Get queue status error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
@@ -162,13 +162,13 @@ router.get('/stats', async (req: Request, res: Response) => {
     // In a production environment, you might want to restrict this to admin users
     const stats = matchmakingService.getMatchmakingStats();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: stats
     });
   } catch (error) {
     console.error('Get matchmaking stats error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });
@@ -181,7 +181,7 @@ router.get('/stats', async (req: Request, res: Response) => {
  */
 router.post('/quick-match', async (req: Request, res: Response) => {
   try {
-    const playerId = req.user?.id;
+    const playerId = req.userId;
     if (!playerId) {
       return res.status(401).json({ 
         success: false, 
@@ -218,16 +218,16 @@ router.post('/quick-match', async (req: Request, res: Response) => {
     );
 
     if (result.success) {
-      res.status(200).json({
+      return res.status(200).json({
         ...result,
         message: 'Joined quick match queue'
       });
     } else {
-      res.status(400).json(result);
+      return res.status(400).json(result);
     }
   } catch (error) {
     console.error('Quick match error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Internal server error'
     });

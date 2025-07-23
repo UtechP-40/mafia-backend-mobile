@@ -80,6 +80,11 @@ export class MatchmakingService {
     connectionInfo: MatchmakingRequest['connectionInfo']
   ): Promise<{ success: boolean; message?: string; queueStatus?: QueueStatus }> {
     try {
+      // Validate ObjectId format first
+      if (!Types.ObjectId.isValid(playerId)) {
+        return { success: false, message: 'Player not found' };
+      }
+
       // Validate player exists and get their stats
       const player = await Player.findById(playerId).select('username statistics').lean();
       if (!player) {
@@ -113,7 +118,7 @@ export class MatchmakingService {
       return { 
         success: true, 
         message: 'Successfully joined matchmaking queue',
-        queueStatus 
+        queueStatus: queueStatus || undefined
       };
     } catch (error) {
       console.error('Join queue error:', error);
