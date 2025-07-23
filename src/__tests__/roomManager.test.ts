@@ -25,21 +25,21 @@ describe('RoomManager', () => {
     testPlayer1 = await Player.create({
       username: 'testhost',
       email: 'host@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar1.png'
     });
 
     testPlayer2 = await Player.create({
       username: 'testplayer2',
       email: 'player2@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar2.png'
     });
 
     testPlayer3 = await Player.create({
       username: 'testplayer3',
       email: 'player3@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar3.png'
     });
   });
@@ -160,7 +160,7 @@ describe('RoomManager', () => {
       const testPlayer4 = await Player.create({
         username: 'testplayer4',
         email: 'player4@test.com',
-        passwordHash: 'hashedpassword',
+        password: 'hashedpassword',
         avatar: 'avatar4.png'
       });
       testRoom.players.push(testPlayer4._id);
@@ -170,7 +170,7 @@ describe('RoomManager', () => {
       const testPlayer5 = await Player.create({
         username: 'testplayer5',
         email: 'player5@test.com',
-        passwordHash: 'hashedpassword',
+        password: 'hashedpassword',
         avatar: 'avatar5.png'
       });
 
@@ -272,7 +272,7 @@ describe('RoomManager', () => {
       const newPlayer = await Player.create({
         username: 'newplayer',
         email: 'new@test.com',
-        passwordHash: 'hashedpassword',
+        password: 'hashedpassword',
         avatar: 'avatar.png'
       });
 

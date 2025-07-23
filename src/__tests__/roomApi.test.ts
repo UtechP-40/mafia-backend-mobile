@@ -1,11 +1,12 @@
 import request from 'supertest';
-import { app } from '../index';
 import { Player } from '../models/Player';
 import { Room, RoomStatus } from '../models/Room';
-import { connectDB, disconnectDB, clearDB } from './setup';
+import { connectDB, disconnectDB, clearDB, setupTestApp } from './setup';
 import jwt from 'jsonwebtoken';
+import { Express } from 'express';
 
 describe('Room API Endpoints', () => {
+  let app: Express;
   let testPlayer1: any;
   let testPlayer2: any;
   let testPlayer3: any;
@@ -23,26 +24,27 @@ describe('Room API Endpoints', () => {
 
   beforeEach(async () => {
     await clearDB();
-
-    // Create test players
+    
+    // Setup test app
+    app = await setupTestApp();
     testPlayer1 = await Player.create({
       username: 'testhost',
       email: 'host@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar1.png'
     });
 
     testPlayer2 = await Player.create({
       username: 'testplayer2',
       email: 'player2@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar2.png'
     });
 
     testPlayer3 = await Player.create({
       username: 'testplayer3',
       email: 'player3@test.com',
-      passwordHash: 'hashedpassword',
+      password: 'hashedpassword',
       avatar: 'avatar3.png'
     });
 
@@ -313,7 +315,7 @@ describe('Room API Endpoints', () => {
       const response = await request(app)
         .post('/api/rooms/join')
         .set('Authorization', `Bearer ${authToken2}`)
-        .send({ roomIdentifier: 'NONEXIST' });
+        .send({ roomIdentifier: 'NONE01' });
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);

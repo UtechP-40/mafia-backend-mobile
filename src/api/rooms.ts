@@ -20,12 +20,29 @@ const isValidRoomCode = (code: string): boolean => {
  */
 router.get('/public', async (req: Request, res: Response): Promise<void> => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const page = req.query.page ? parseInt(req.query.page as string) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
     const maxPlayers = req.query.maxPlayers ? parseInt(req.query.maxPlayers as string) : undefined;
     const hasVoiceChat = req.query.hasVoiceChat ? req.query.hasVoiceChat === 'true' : undefined;
     const allowSpectators = req.query.allowSpectators ? req.query.allowSpectators === 'true' : undefined;
     const search = req.query.search as string;
+
+    // Validate pagination parameters
+    if (page < 1) {
+      res.status(400).json({
+        success: false,
+        message: 'Page must be greater than 0'
+      });
+      return;
+    }
+
+    if (limit < 1 || limit > 100) {
+      res.status(400).json({
+        success: false,
+        message: 'Limit must be between 1 and 100'
+      });
+      return;
+    }
 
     const filters = {
       maxPlayers,

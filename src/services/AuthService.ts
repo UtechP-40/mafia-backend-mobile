@@ -34,10 +34,10 @@ export interface RegistrationData {
 }
 
 export class AuthService {
-  private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'access-secret-key';
-  private static readonly REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh-secret-key';
-  private static readonly ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
-  private static readonly REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  private static get ACCESS_TOKEN_SECRET() { return process.env.JWT_ACCESS_SECRET || 'access-secret-key'; }
+  private static get REFRESH_TOKEN_SECRET() { return process.env.JWT_REFRESH_SECRET || 'refresh-secret-key'; }
+  private static get ACCESS_TOKEN_EXPIRES_IN() { return process.env.JWT_ACCESS_EXPIRES_IN || '15m'; }
+  private static get REFRESH_TOKEN_EXPIRES_IN() { return process.env.JWT_REFRESH_EXPIRES_IN || '7d'; }
   private static readonly SALT_ROUNDS = 12;
 
   /**
