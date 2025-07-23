@@ -12,6 +12,7 @@ import { playerRoutes } from './api/players';
 import { roomRoutes } from './api/rooms';
 import { gameRoutes } from './api/games';
 import matchmakingRoutes from './api/matchmaking';
+import aiRoutes from './api/ai';
 import { SocketService } from './services/SocketService';
 
 // Load environment variables
@@ -49,6 +50,7 @@ app.use('/api/players', playerRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/matchmaking', matchmakingRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Initialize Socket.io service
 const socketService = new SocketService(io);
