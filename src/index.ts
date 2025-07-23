@@ -1,28 +1,28 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import { connectDatabase } from './utils/database';
-import { errorHandler } from './middleware/errorHandler';
-import { 
-  analyticsMiddleware, 
-  requestTrackingMiddleware, 
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import dotenv from "dotenv";
+import { connectDatabase } from "./utils/database";
+import { errorHandler } from "./middleware/errorHandler";
+import {
+  analyticsMiddleware,
+  requestTrackingMiddleware,
   performanceTrackingMiddleware,
   errorTrackingMiddleware,
-  sessionTrackingMiddleware 
-} from './middleware/analyticsMiddleware';
-import { authRoutes } from './api/auth';
-import { playerRoutes } from './api/players';
-import { roomRoutes } from './api/rooms';
-import { gameRoutes } from './api/games';
-import matchmakingRoutes from './api/matchmaking';
-import aiRoutes from './api/ai';
-import analyticsRoutes from './api/analytics';
-import { SocketService } from './services/SocketService';
-import { analyticsService } from './services/AnalyticsService';
+  sessionTrackingMiddleware,
+} from "./middleware/analyticsMiddleware";
+import { authRoutes } from "./api/auth";
+import { playerRoutes } from "./api/players";
+import { roomRoutes } from "./api/rooms";
+import { gameRoutes } from "./api/games";
+import matchmakingRoutes from "./api/matchmaking";
+import aiRoutes from "./api/ai";
+import analyticsRoutes from "./api/analytics";
+import { SocketService } from "./services/SocketService";
+import { analyticsService } from "./services/AnalyticsService";
 
 // Load environment variables
 dotenv.config();
@@ -32,34 +32,43 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "*",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
-  credentials: true
-}));
-app.use(morgan('combined'));
-app.use(express.json({ limit: '10mb' }));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "*",
+    credentials: true,
+  })
+);
+app.use(morgan("combined"));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Analytics middleware
+app.use(analyticsMiddleware);
+app.use(requestTrackingMiddleware);
+app.use(performanceTrackingMiddleware);
+app.use(sessionTrackingMiddleware);
+
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/players', playerRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/matchmaking', matchmakingRoutes);
-app.use('/api/ai', aiRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/players", playerRoutes);
+app.use("/api/rooms", roomRoutes);
+app.use("/api/games", gameRoutes);
+app.use("/api/matchmaking", matchmakingRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Initialize Socket.io service
 const socketService = new SocketService(io);
@@ -69,7 +78,33 @@ setInterval(() => {
   socketService.cleanupInactiveSessions(30); // 30 minute timeout
 }, 5 * 60 * 1000);
 
+// Set up analytics data cleanup interval (daily at 2 AM)
+const scheduleAnalyticsCleanup = () => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(2, 0, 0, 0); // 2 AM tomorrow
+
+  const msUntilTomorrow = tomorrow.getTime() - now.getTime();
+
+  setTimeout(() => {
+    // Run cleanup and then schedule for every 24 hours
+    analyticsService.cleanupOldData(90).catch((error) => {
+      console.error("Analytics cleanup failed:", error);
+    });
+
+    setInterval(() => {
+      analyticsService.cleanupOldData(90).catch((error) => {
+        console.error("Analytics cleanup failed:", error);
+      });
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
+  }, msUntilTomorrow);
+};
+
+scheduleAnalyticsCleanup();
+
 // Error handling middleware (must be last)
+app.use(errorTrackingMiddleware);
 app.use(errorHandler);
 
 // Start server
@@ -78,10 +113,10 @@ async function startServer() {
     await connectDatabase();
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }

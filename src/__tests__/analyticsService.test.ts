@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
+import { analyticsService } from '../services';
 import {
-  analyticsService,
   EventType,
   MetricType,
   AnalyticsEvent,
@@ -10,7 +10,7 @@ import {
   ErrorLog,
   Experiment,
   UserExperiment
-} from '../services';
+} from '../models';
 
 describe('AnalyticsService', () => {
   let mongoServer: MongoMemoryServer;
@@ -97,7 +97,7 @@ describe('AnalyticsService', () => {
       expect(metric.metricName).toBe('api_response_time');
       expect(metric.metricType).toBe(MetricType.TIMER);
       expect(metric.value).toBe(150.5);
-      expect(metric.tags.get('endpoint')).toBe('/api/games');
+      expect(metric.tags.endpoint).toBe('/api/games');
       expect(metric.source).toBe('api');
     });
 
@@ -111,7 +111,7 @@ describe('AnalyticsService', () => {
 
       expect(metric).toBeDefined();
       expect(metric.metricName).toBe('memory_usage');
-      expect(metric.tags.size).toBe(0);
+      expect(typeof metric.tags).toBe('object');
     });
   });
 

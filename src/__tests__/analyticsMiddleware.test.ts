@@ -40,9 +40,26 @@ describe('Analytics Middleware', () => {
       method: 'GET',
       sessionID: 'test-session-123',
       user: {
+        _id: new Types.ObjectId(),
         id: new Types.ObjectId().toString(),
-        username: 'testuser'
-      },
+        username: 'testuser',
+        avatar: 'test-avatar.png',
+        isAlive: true,
+        isHost: false,
+        statistics: {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          winRate: 0,
+          favoriteRole: 'villager' as any,
+          averageGameDuration: 0,
+          eloRating: 1200
+        },
+        friends: [],
+        refreshTokens: [],
+        createdAt: new Date(),
+        lastActive: new Date(),
+        updatedAt: new Date()
+      } as any,
       get: jest.fn((header: string) => {
         const headers: Record<string, string> = {
           'User-Agent': 'test-agent',
@@ -50,7 +67,7 @@ describe('Analytics Middleware', () => {
           'X-App-Version': '1.0.0'
         };
         return headers[header];
-      }),
+      }) as any,
       ip: '127.0.0.1'
     };
 
@@ -94,8 +111,8 @@ describe('Analytics Middleware', () => {
       expect(metrics).toHaveLength(1);
       expect(metrics[0].metricName).toBe('test_metric');
       expect(metrics[0].value).toBe(100);
-      expect(metrics[0].tags.get('tag')).toBe('value');
-      expect(metrics[0].tags.get('endpoint')).toBe('/api/test');
+      expect(metrics[0].tags.tag).toBe('value');
+      expect(metrics[0].tags.endpoint).toBe('/api/test');
     });
 
     it('should log error successfully', async () => {
@@ -129,7 +146,7 @@ describe('Analytics Middleware', () => {
 
   describe('requestTrackingMiddleware', () => {
     it('should track login events', async () => {
-      req.path = '/auth/login';
+      (req as any).path = '/auth/login';
       req.trackEvent = jest.fn();
 
       requestTrackingMiddleware(req as Request, res as Response, next);
@@ -144,8 +161,8 @@ describe('Analytics Middleware', () => {
     });
 
     it('should track game start events', async () => {
-      req.path = '/games';
-      req.method = 'POST';
+      (req as any).path = '/games';
+      (req as any).method = 'POST';
       req.trackEvent = jest.fn();
 
       requestTrackingMiddleware(req as Request, res as Response, next);
@@ -159,8 +176,8 @@ describe('Analytics Middleware', () => {
     });
 
     it('should track room creation events', async () => {
-      req.path = '/rooms';
-      req.method = 'POST';
+      (req as any).path = '/rooms';
+      (req as any).method = 'POST';
       req.trackEvent = jest.fn();
 
       requestTrackingMiddleware(req as Request, res as Response, next);

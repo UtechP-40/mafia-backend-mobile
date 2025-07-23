@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import express from 'express';
 import { Types } from 'mongoose';
 import analyticsRouter from '../api/analytics';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { authenticateToken } from '../middleware/authMiddleware';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { analyticsMiddleware } from '../middleware/analyticsMiddleware';
 import {
@@ -21,7 +21,7 @@ import {
 jest.mock('../middleware/authMiddleware');
 jest.mock('../middleware/rateLimiter');
 
-const mockAuthMiddleware = authMiddleware as jest.MockedFunction<typeof authMiddleware>;
+const mockAuthMiddleware = authenticateToken as jest.MockedFunction<typeof authenticateToken>;
 const mockRateLimiter = rateLimiter as jest.MockedFunction<typeof rateLimiter>;
 
 describe('Analytics API', () => {
@@ -40,14 +40,14 @@ describe('Analytics API', () => {
     app.use(analyticsMiddleware);
 
     // Mock auth middleware to add user to request
-    mockAuthMiddleware.mockImplementation((req: any, res: any, next: any) => {
+    mockAuthMiddleware.mockImplementation(async (req: any, res: any, next: any) => {
       req.user = mockUser;
       req.sessionID = 'test-session-123';
       next();
     });
 
     // Mock rate limiter
-    mockRateLimiter.mockImplementation((req: any, res: any, next: any) => {
+    mockRateLimiter.mockReturnValue((req: any, res: any, next: any) => {
       next();
     });
 

@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from 'mongoose';
+import mongoose, { Schema, model, Document, Types } from 'mongoose';
 
 // Enums for analytics events
 export enum EventType {
@@ -185,9 +185,8 @@ const PerformanceMetricSchema = new Schema<IPerformanceMetric>({
     required: true
   },
   tags: {
-    type: Map,
-    of: String,
-    default: new Map()
+    type: Schema.Types.Mixed,
+    default: {}
   },
   timestamp: {
     type: Date,
@@ -340,6 +339,16 @@ ExperimentSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
 UserExperimentSchema.index({ userId: 1, experimentId: 1 }, { unique: true });
 UserExperimentSchema.index({ experimentId: 1, variant: 1 });
 
+// Define interfaces for static methods
+interface IAnalyticsEventModel extends mongoose.Model<IAnalyticsEvent> {
+  getEventCounts(startDate: Date, endDate: Date, eventTypes?: EventType[]): Promise<any[]>;
+  getUserActivity(startDate: Date, endDate: Date): Promise<any[]>;
+}
+
+interface IPerformanceMetricModel extends mongoose.Model<IPerformanceMetric> {
+  getMetricStats(metricName: string, startDate: Date, endDate: Date): Promise<any[]>;
+}
+
 // Static methods for analytics aggregation
 AnalyticsEventSchema.statics.getEventCounts = function(
   startDate: Date,
@@ -424,8 +433,8 @@ PerformanceMetricSchema.statics.getMetricStats = function(
   ]);
 };
 
-export const AnalyticsEvent = model<IAnalyticsEvent>('AnalyticsEvent', AnalyticsEventSchema);
-export const PerformanceMetric = model<IPerformanceMetric>('PerformanceMetric', PerformanceMetricSchema);
+export const AnalyticsEvent = model<IAnalyticsEvent, IAnalyticsEventModel>('AnalyticsEvent', AnalyticsEventSchema);
+export const PerformanceMetric = model<IPerformanceMetric, IPerformanceMetricModel>('PerformanceMetric', PerformanceMetricSchema);
 export const ErrorLog = model<IErrorLog>('ErrorLog', ErrorLogSchema);
 export const Experiment = model<IExperiment>('Experiment', ExperimentSchema);
 export const UserExperiment = model<IUserExperiment>('UserExperiment', UserExperimentSchema);

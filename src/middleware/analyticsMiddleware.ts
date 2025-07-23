@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
-import { analyticsService, EventType } from '../services';
+import { analyticsService } from '../services';
+import { EventType, MetricType } from '../models';
 
 // Extend Request interface to include analytics tracking
 declare global {
@@ -46,7 +47,7 @@ export const analyticsMiddleware = (req: Request, res: Response, next: NextFunct
     try {
       await analyticsService.recordMetric({
         metricName,
-        metricType: 'gauge', // Default to gauge, can be overridden
+        metricType: MetricType.GAUGE, // Default to gauge, can be overridden
         value,
         tags: {
           ...tags,
@@ -122,7 +123,7 @@ export const requestTrackingMiddleware = (req: Request, res: Response, next: Nex
 
   // Override res.end to track response metrics
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any) {
+  res.end = function(chunk?: any, encoding?: any): any {
     const responseTime = Date.now() - startTime;
 
     // Track response time metric
@@ -146,7 +147,7 @@ export const requestTrackingMiddleware = (req: Request, res: Response, next: Nex
     }
 
     // Call original end method
-    originalEnd.call(this, chunk, encoding);
+    return originalEnd.call(this, chunk, encoding);
   };
 
   // Track the request
@@ -164,7 +165,7 @@ export const performanceTrackingMiddleware = (req: Request, res: Response, next:
 
   // Override res.end to capture performance metrics
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any) {
+  res.end = function(chunk?: any, encoding?: any): any {
     const endTime = process.hrtime.bigint();
     const endMemory = process.memoryUsage();
     
@@ -189,7 +190,7 @@ export const performanceTrackingMiddleware = (req: Request, res: Response, next:
     }
 
     // Call original end method
-    originalEnd.call(this, chunk, encoding);
+    return originalEnd.call(this, chunk, encoding);
   };
 
   next();

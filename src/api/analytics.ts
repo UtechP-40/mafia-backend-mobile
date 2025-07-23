@@ -1,14 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { Types } from 'mongoose';
-import { analyticsService, EventType, MetricType } from '../services';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { analyticsService } from '../services';
+import { EventType, MetricType } from '../models';
+import { authenticateToken } from '../middleware/authMiddleware';
 import { rateLimiter } from '../middleware/rateLimiter';
+
+// Extend Request interface to include sessionID
+declare global {
+  namespace Express {
+    interface Request {
+      sessionID?: string;
+    }
+  }
+}
 
 const router = Router();
 
 // Middleware for analytics routes
-router.use(authMiddleware);
-router.use(rateLimiter);
+router.use(authenticateToken);
+router.use(rateLimiter({ windowMs: 15 * 60 * 1000, maxRequests: 100 }));
 
 /**
  * Track an analytics event
