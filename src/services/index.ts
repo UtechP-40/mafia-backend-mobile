@@ -5,4 +5,5 @@ export * from './MatchmakingService';
 export * from './PlayerService';
 export * from './RoomService';
 export * from './SocketService';
+export * from './AnalyticsService';
 export { default as AIService } from './AIService';
