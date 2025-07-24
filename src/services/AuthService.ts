@@ -189,6 +189,7 @@ export class AuthService {
         : { email: credentials.email };
 
       const player = await Player.findOne(query).select('+password');
+      console.log(player)
       if (!player || !player.password) {
         return { success: false, message: 'Invalid credentials' };
       }

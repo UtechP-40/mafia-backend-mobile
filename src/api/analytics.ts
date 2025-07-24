@@ -56,13 +56,13 @@ router.post('/events', async (req: Request, res: Response) => {
       version
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: event
     });
   } catch (error) {
     console.error('Error tracking event:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to track event'
     });
@@ -107,13 +107,13 @@ router.post('/metrics', async (req: Request, res: Response) => {
       source: source || 'client'
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: metric
     });
   } catch (error) {
     console.error('Error recording metric:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to record metric'
     });
@@ -149,13 +149,13 @@ router.post('/errors', async (req: Request, res: Response) => {
       severity: severity || 'medium'
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: errorLog
     });
   } catch (error) {
     console.error('Error logging error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to log error'
     });
@@ -187,7 +187,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
     const metrics = await analyticsService.getDashboardMetrics(start, end);
 
-    res.json({
+    return res.json({
       success: true,
       data: metrics,
       dateRange: {
@@ -197,7 +197,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error getting dashboard metrics:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to get dashboard metrics'
     });
@@ -247,7 +247,7 @@ router.get('/events', async (req: Request, res: Response) => {
       Math.min(parseInt(limit as string), 1000) // Cap at 1000 events per request
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: result.events,
       pagination: {
@@ -263,7 +263,7 @@ router.get('/events', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error getting events:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to get events'
     });
@@ -320,9 +320,9 @@ router.get('/export', async (req: Request, res: Response) => {
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=analytics-export-${Date.now()}.csv`);
-      res.send(data);
+      return res.send(data);
     } else {
-      res.json({
+      return res.json({
         success: true,
         data,
         dateRange: {
@@ -333,7 +333,7 @@ router.get('/export', async (req: Request, res: Response) => {
     }
   } catch (error) {
     console.error('Error exporting data:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to export data'
     });
@@ -383,13 +383,13 @@ router.post('/experiments', async (req: Request, res: Response) => {
       createdBy: new Types.ObjectId(req.user!.id)
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: experiment
     });
   } catch (error) {
     console.error('Error creating experiment:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to create experiment'
     });
@@ -417,13 +417,13 @@ router.get('/experiments/:experimentId/assignment', async (req: Request, res: Re
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: assignment
     });
   } catch (error) {
     console.error('Error getting experiment assignment:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to get experiment assignment'
     });
@@ -453,13 +453,13 @@ router.post('/experiments/:experimentId/conversion', async (req: Request, res: R
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Conversion recorded successfully'
     });
   } catch (error) {
     console.error('Error recording conversion:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to record conversion'
     });
@@ -478,13 +478,13 @@ router.get('/experiments/:experimentId/results', async (req: Request, res: Respo
       new Types.ObjectId(experimentId)
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: results
     });
   } catch (error) {
     console.error('Error getting experiment results:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to get experiment results'
     });
@@ -507,7 +507,7 @@ router.get('/health', async (req: Request, res: Response) => {
       endDate: now
     }, 1, 1);
 
-    res.json({
+    return res.json({
       success: true,
       status: 'healthy',
       timestamp: now,
@@ -518,7 +518,7 @@ router.get('/health', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Health check failed:', error);
-    res.status(503).json({
+    return res.status(503).json({
       success: false,
       status: 'unhealthy',
       timestamp: new Date(),

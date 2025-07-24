@@ -93,7 +93,7 @@ router.post('/register', authRateLimit(3, 15 * 60 * 1000), async (req: Request, 
 router.post('/login', authRateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, email, password }: LoginCredentials = req.body;
-
+    console.log( username , 'username')
     // Input validation
     if (!password) {
       res.status(400).json({
