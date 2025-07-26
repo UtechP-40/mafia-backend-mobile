@@ -90,9 +90,14 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction): 
       req.body = SecurityService.sanitizeObject(req.body);
     }
     
-    // Sanitize query parameters
+    // Sanitize query parameters - req.query is read-only, so we modify properties individually
     if (req.query && typeof req.query === 'object') {
-      req.query = SecurityService.sanitizeObject(req.query);
+      const sanitizedQuery = SecurityService.sanitizeObject(req.query);
+      // Clear existing properties and set sanitized ones
+      Object.keys(req.query).forEach(key => {
+        delete (req.query as any)[key];
+      });
+      Object.assign(req.query, sanitizedQuery);
     }
     
     // Sanitize URL parameters
