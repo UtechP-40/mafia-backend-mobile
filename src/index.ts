@@ -14,6 +14,13 @@ import {
   errorTrackingMiddleware,
   sessionTrackingMiddleware,
 } from "./middleware/analyticsMiddleware";
+import {
+  createRateLimit,
+  sanitizeInput,
+  securityHeaders,
+  suspiciousActivityDetection,
+  requestSizeLimit
+} from "./middleware/securityMiddleware";
 import { authRoutes } from "./api/auth";
 import { playerRoutes } from "./api/players";
 import { roomRoutes } from "./api/rooms";
@@ -21,8 +28,12 @@ import { gameRoutes } from "./api/games";
 import matchmakingRoutes from "./api/matchmaking";
 import aiRoutes from "./api/ai";
 import analyticsRoutes from "./api/analytics";
+import { gdprRoutes } from "./api/gdpr";
+import { securityRoutes } from "./api/security";
 import { SocketService } from "./services/SocketService";
 import { analyticsService } from "./services/AnalyticsService";
+import { AntiCheatService } from "./services/AntiCheatService";
+import { GDPRService } from "./services/GDPRService";
 
 // Load environment variables
 dotenv.config();
@@ -38,17 +49,70 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(helmet());
+// Security middleware (applied first)
+app.use(securityHeaders);
+app.use(suspiciousActivityDetection);
+app.use(requestSizeLimit(5 * 1024 * 1024)); // 5MB limit
+
+// Enhanced helmet configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"]
+    }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// CORS with enhanced security
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "*",
+    origin: process.env.NODE_ENV === 'production' 
+      ? process.env.FRONTEND_URL 
+      : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Session-Token'],
+    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset']
   })
 );
-app.use(morgan("combined"));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+
+// Request logging with security context
+app.use(morgan('combined', {
+  skip: (req) => req.url === '/health'
+}));
+
+// Global rate limiting
+app.use(createRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 1000, // per IP
+  keyGenerator: (req) => req.ip || 'unknown'
+}));
+
+// Body parsing with size limits
+app.use(express.json({ 
+  limit: "1mb",
+  verify: (req, res, buf) => {
+    // Store raw body for signature verification if needed
+    (req as any).rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Input sanitization
+app.use(sanitizeInput);
 
 // Analytics middleware
 app.use(analyticsMiddleware);
@@ -69,6 +133,8 @@ app.use("/api/games", gameRoutes);
 app.use("/api/matchmaking", matchmakingRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/gdpr", gdprRoutes);
+app.use("/api/security", securityRoutes);
 
 // Initialize Socket.io service
 const socketService = new SocketService(io);
@@ -102,6 +168,12 @@ const scheduleAnalyticsCleanup = () => {
 };
 
 scheduleAnalyticsCleanup();
+
+// Set up security cleanup intervals
+setInterval(() => {
+  AntiCheatService.cleanupOldData();
+  GDPRService.cleanupExpiredRequests();
+}, 60 * 60 * 1000); // Every hour
 
 // Error handling middleware (must be last)
 app.use(errorTrackingMiddleware);

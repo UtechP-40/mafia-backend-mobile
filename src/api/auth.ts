@@ -1,55 +1,48 @@
 import { Router, Request, Response } from 'express';
 import { AuthService, LoginCredentials, RegistrationData } from '../services/AuthService';
 import { authenticateToken, validateRefreshToken, authRateLimit } from '../middleware/authMiddleware';
+import { createRateLimit, validateRequest } from '../middleware/securityMiddleware';
+import { authValidationSchemas } from '../utils/validation';
+import { SecurityService } from '../services/SecurityService';
 
 const router = Router();
+
+// Enhanced rate limiting for registration
+const registrationRateLimit = createRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 3,
+  keyGenerator: (req) => req.ip || 'unknown',
+  onLimitReached: (req) => {
+    SecurityService.logSecurityEvent({
+      type: 'registration_rate_limit_exceeded',
+      ip: req.ip || 'unknown',
+      userAgent: req.get('User-Agent') || 'unknown',
+      url: req.url,
+      indicators: ['rate_limit_violation'],
+      timestamp: new Date(),
+      severity: 'medium'
+    });
+  }
+});
 
 /**
  * POST /api/auth/register
  * Register a new player account
  */
-router.post('/register', authRateLimit(3, 15 * 60 * 1000), async (req: Request, res: Response): Promise<void> => {
+router.post('/register', 
+  registrationRateLimit,
+  validateRequest(authValidationSchemas.register),
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, email, password, avatar }: RegistrationData = req.body;
 
-    // Input validation
-    if (!username || !password) {
+    // Enhanced password strength validation
+    const passwordStrength = SecurityService.validatePasswordStrength(password);
+    if (!passwordStrength.isStrong) {
       res.status(400).json({
         success: false,
-        message: 'Username and password are required'
-      });
-      return;
-    }
-
-    // Additional validation
-    if (username.length < 3 || username.length > 20) {
-      res.status(400).json({
-        success: false,
-        message: 'Username must be between 3 and 20 characters'
-      });
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      res.status(400).json({
-        success: false,
-        message: 'Username can only contain letters, numbers, and underscores'
-      });
-      return;
-    }
-
-    if (password.length < 6) {
-      res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-      return;
-    }
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
+        message: 'Password does not meet security requirements',
+        details: passwordStrength.feedback
       });
       return;
     }
@@ -86,30 +79,34 @@ router.post('/register', authRateLimit(3, 15 * 60 * 1000), async (req: Request, 
   }
 });
 
+// Enhanced rate limiting for login
+const loginRateLimit = createRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 5,
+  keyGenerator: (req) => req.ip || 'unknown',
+  onLimitReached: (req) => {
+    SecurityService.logSecurityEvent({
+      type: 'login_rate_limit_exceeded',
+      ip: req.ip || 'unknown',
+      userAgent: req.get('User-Agent') || 'unknown',
+      url: req.url,
+      indicators: ['rate_limit_violation', 'potential_brute_force'],
+      timestamp: new Date(),
+      severity: 'high'
+    });
+  }
+});
+
 /**
  * POST /api/auth/login
  * Login with username/email and password
  */
-router.post('/login', authRateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response): Promise<void> => {
+router.post('/login', 
+  loginRateLimit,
+  validateRequest(authValidationSchemas.login),
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, email, password }: LoginCredentials = req.body;
-    console.log( username , 'username')
-    // Input validation
-    if (!password) {
-      res.status(400).json({
-        success: false,
-        message: 'Password is required'
-      });
-      return;
-    }
-
-    if (!username && !email) {
-      res.status(400).json({
-        success: false,
-        message: 'Username or email is required'
-      });
-      return;
-    }
 
     const result = await AuthService.login({
       username,

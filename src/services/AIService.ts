@@ -1,32 +1,32 @@
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { IGame, IPlayer, IChatMessage, GamePhase } from '../models';
-import { logger } from '../utils/logger';
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { IGame, IPlayer, IChatMessage, GamePhase } from "../models";
+import { logger } from "../utils/logger";
 
 export interface AIModeratorResponse {
   message: string;
-  action?: 'warn' | 'mute' | 'kick';
+  action?: "warn" | "mute" | "kick";
   confidence: number;
 }
 
 export interface ContentModerationResult {
   isAppropriate: boolean;
   reason?: string;
-  severity: 'low' | 'medium' | 'high';
-  suggestedAction?: 'filter' | 'warn' | 'block';
+  severity: "low" | "medium" | "high";
+  suggestedAction?: "filter" | "warn" | "block";
 }
 
 export interface PlayerBehaviorAnalysis {
   playerId: string;
   suspiciousPatterns: string[];
-  riskLevel: 'low' | 'medium' | 'high';
+  riskLevel: "low" | "medium" | "high";
   recommendations: string[];
 }
 
 export interface GameplayTip {
   message: string;
   relevance: number;
-  timing: 'immediate' | 'next_phase' | 'end_game';
+  timing: "immediate" | "next_phase" | "end_game";
 }
 
 class AIService {
@@ -40,22 +40,22 @@ class AIService {
   private initializeModel(): void {
     try {
       if (!process.env.GEMINI_API_KEY) {
-        logger.warn('GEMINI_API_KEY environment variable is not set');
+        logger.warn("GEMINI_API_KEY environment variable is not set");
         this.isInitialized = false;
         return;
       }
 
       this.model = new ChatGoogleGenerativeAI({
-        model: 'gemini-2.0-flash-exp',
+        model: "gemini-2.0-flash-exp",
         apiKey: process.env.GEMINI_API_KEY,
         temperature: 0.7,
         maxOutputTokens: 1024,
       });
 
       this.isInitialized = true;
-      logger.info('AI Service initialized successfully');
+      logger.info("AI Service initialized successfully");
     } catch (error) {
-      logger.error('Failed to initialize AI Service:', error);
+      logger.error("Failed to initialize AI Service:", error);
       this.isInitialized = false;
     }
   }
@@ -76,7 +76,7 @@ class AIService {
     issue?: string
   ): Promise<AIModeratorResponse> {
     if (!this.isInitialized) {
-      throw new Error('AI Service is not initialized');
+      throw new Error("AI Service is not initialized");
     }
 
     try {
@@ -89,18 +89,20 @@ class AIService {
 Current game context:
 - Phase: ${gameState.phase}
 - Day: ${gameState.dayNumber}
-- Players alive: ${gameState.players.length - gameState.eliminatedPlayers.length}
+- Players alive: ${
+        gameState.players.length - gameState.eliminatedPlayers.length
+      }
 - Total players: ${gameState.players.length}
 
 Respond with helpful, neutral, and encouraging guidance. Keep responses concise and game-focused.`;
 
-      const userPrompt = issue 
+      const userPrompt = issue
         ? `Issue reported: ${issue}\nContext: ${context}`
         : `Game situation: ${context}`;
 
       const messages = [
         new SystemMessage(systemPrompt),
-        new HumanMessage(userPrompt)
+        new HumanMessage(userPrompt),
       ];
 
       const response = await this.model.invoke(messages);
@@ -113,20 +115,23 @@ Respond with helpful, neutral, and encouraging guidance. Keep responses concise 
       return {
         message: content,
         action,
-        confidence
+        confidence,
       };
     } catch (error) {
-      logger.error('Error in AI game moderation:', error);
-      throw new Error('Failed to generate moderation response');
+      logger.error("Error in AI game moderation:", error);
+      throw new Error("Failed to generate moderation response");
     }
   }
 
   /**
    * Chat Moderation - Filters inappropriate content
    */
-  async moderateContent(message: string, context?: any): Promise<ContentModerationResult> {
+  async moderateContent(
+    message: string,
+    context?: any
+  ): Promise<ContentModerationResult> {
     if (!this.isInitialized) {
-      return { isAppropriate: true, severity: 'low' };
+      return { isAppropriate: true, severity: "low" };
     }
 
     try {
@@ -147,7 +152,7 @@ Be lenient with game-related banter and strategic deception, as these are part o
 
       const messages = [
         new SystemMessage(systemPrompt),
-        new HumanMessage(`Analyze this message: "${message}"`)
+        new HumanMessage(`Analyze this message: "${message}"`),
       ];
 
       const response = await this.model.invoke(messages);
@@ -158,22 +163,22 @@ Be lenient with game-related banter and strategic deception, as these are part o
         return {
           isAppropriate: result.isAppropriate ?? true,
           reason: result.reason,
-          severity: result.severity ?? 'low',
-          suggestedAction: result.suggestedAction
+          severity: result.severity ?? "low",
+          suggestedAction: result.suggestedAction,
         };
       } catch (parseError) {
         // Fallback if JSON parsing fails
-        const isAppropriate = !content.toLowerCase().includes('inappropriate');
+        const isAppropriate = !content.toLowerCase().includes("inappropriate");
         return {
           isAppropriate,
-          severity: 'low',
-          reason: isAppropriate ? undefined : 'Content flagged for review'
+          severity: "low",
+          reason: isAppropriate ? undefined : "Content flagged for review",
         };
       }
     } catch (error) {
-      logger.error('Error in content moderation:', error);
+      logger.error("Error in content moderation:", error);
       // Fail safe - allow content if AI fails
-      return { isAppropriate: true, severity: 'low' };
+      return { isAppropriate: true, severity: "low" };
     }
   }
 
@@ -189,8 +194,8 @@ Be lenient with game-related banter and strategic deception, as these are part o
       return {
         playerId: player._id.toString(),
         suspiciousPatterns: [],
-        riskLevel: 'low',
-        recommendations: []
+        riskLevel: "low",
+        recommendations: [],
       };
     }
 
@@ -214,16 +219,24 @@ Consider that some unusual behavior might be legitimate strategy.`;
         gamesPlayed: player.statistics?.gamesPlayed || 0,
         winRate: player.statistics?.winRate || 0,
         recentGames: gameHistory.slice(-10),
-        currentGameBehavior: currentGame ? {
-          phase: currentGame.phase,
-          isAlive: player.isAlive,
-          role: player.role
-        } : null
+        currentGameBehavior: currentGame
+          ? {
+              phase: currentGame.phase,
+              isAlive: player.isAlive,
+              role: player.role,
+            }
+          : null,
       };
 
       const messages = [
         new SystemMessage(systemPrompt),
-        new HumanMessage(`Analyze this player's behavior: ${JSON.stringify(playerData, null, 2)}`)
+        new HumanMessage(
+          `Analyze this player's behavior: ${JSON.stringify(
+            playerData,
+            null,
+            2
+          )}`
+        ),
       ];
 
       const response = await this.model.invoke(messages);
@@ -234,24 +247,24 @@ Consider that some unusual behavior might be legitimate strategy.`;
         return {
           playerId: player._id.toString(),
           suspiciousPatterns: result.suspiciousPatterns || [],
-          riskLevel: result.riskLevel || 'low',
-          recommendations: result.recommendations || []
+          riskLevel: result.riskLevel || "low",
+          recommendations: result.recommendations || [],
         };
       } catch (parseError) {
         return {
           playerId: player._id.toString(),
           suspiciousPatterns: [],
-          riskLevel: 'low',
-          recommendations: []
+          riskLevel: "low",
+          recommendations: [],
         };
       }
     } catch (error) {
-      logger.error('Error in player behavior analysis:', error);
+      logger.error("Error in player behavior analysis:", error);
       return {
         playerId: player._id.toString(),
         suspiciousPatterns: [],
-        riskLevel: 'low',
-        recommendations: []
+        riskLevel: "low",
+        recommendations: [],
       };
     }
   }
@@ -262,7 +275,7 @@ Consider that some unusual behavior might be legitimate strategy.`;
   async provideGameplayTips(
     player: IPlayer,
     gameState: IGame,
-    playerExperience: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
+    playerExperience: "beginner" | "intermediate" | "advanced" = "intermediate"
   ): Promise<GameplayTip[]> {
     if (!this.isInitialized) {
       return [];
@@ -286,17 +299,24 @@ Keep tips strategic but not game-breaking. Don't reveal information players shou
       const gameContext = {
         phase: gameState.phase,
         dayNumber: gameState.dayNumber,
-        playersAlive: gameState.players.length - gameState.eliminatedPlayers.length,
+        playersAlive:
+          gameState.players.length - gameState.eliminatedPlayers.length,
         totalPlayers: gameState.players.length,
         playerRole: player.role,
         playerIsAlive: player.isAlive,
         experienceLevel: playerExperience,
-        timeRemaining: gameState.timeRemaining
+        timeRemaining: gameState.timeRemaining,
       };
 
       const messages = [
         new SystemMessage(systemPrompt),
-        new HumanMessage(`Provide gameplay tips for this situation: ${JSON.stringify(gameContext, null, 2)}`)
+        new HumanMessage(
+          `Provide gameplay tips for this situation: ${JSON.stringify(
+            gameContext,
+            null,
+            2
+          )}`
+        ),
       ];
 
       const response = await this.model.invoke(messages);
@@ -310,7 +330,7 @@ Keep tips strategic but not game-breaking. Don't reveal information players shou
         return this.getBasicTips(gameState.phase, playerExperience);
       }
     } catch (error) {
-      logger.error('Error providing gameplay tips:', error);
+      logger.error("Error providing gameplay tips:", error);
       return this.getBasicTips(gameState.phase, playerExperience);
     }
   }
@@ -328,25 +348,28 @@ Keep tips strategic but not game-breaking. Don't reveal information players shou
       const response = await this.model.invoke([testMessage]);
       return response.content !== null;
     } catch (error) {
-      logger.error('AI Service health check failed:', error);
+      logger.error("AI Service health check failed:", error);
       return false;
     }
   }
 
   // Helper methods
-  private extractModerationAction(content: string, issue?: string): 'warn' | 'mute' | 'kick' | undefined {
+  private extractModerationAction(
+    content: string,
+    issue?: string
+  ): "warn" | "mute" | "kick" | undefined {
     const lowerContent = content.toLowerCase();
-    
-    if (lowerContent.includes('kick') || lowerContent.includes('remove')) {
-      return 'kick';
+
+    if (lowerContent.includes("kick") || lowerContent.includes("remove")) {
+      return "kick";
     }
-    if (lowerContent.includes('mute') || lowerContent.includes('silence')) {
-      return 'mute';
+    if (lowerContent.includes("mute") || lowerContent.includes("silence")) {
+      return "mute";
     }
-    if (lowerContent.includes('warn') || lowerContent.includes('caution')) {
-      return 'warn';
+    if (lowerContent.includes("warn") || lowerContent.includes("caution")) {
+      return "warn";
     }
-    
+
     return undefined;
   }
 
@@ -354,13 +377,15 @@ Keep tips strategic but not game-breaking. Don't reveal information players shou
     // Simple confidence calculation based on response characteristics
     const hasSpecificAction = /\b(warn|mute|kick|remove)\b/i.test(content);
     const hasReasoning = content.length > 50;
-    const hasIssueContext = issue ? content.toLowerCase().includes(issue.toLowerCase()) : true;
-    
+    const hasIssueContext = issue
+      ? content.toLowerCase().includes(issue.toLowerCase())
+      : true;
+
     let confidence = 0.5;
     if (hasSpecificAction) confidence += 0.2;
     if (hasReasoning) confidence += 0.2;
     if (hasIssueContext) confidence += 0.1;
-    
+
     return Math.min(confidence, 1.0);
   }
 
@@ -368,31 +393,34 @@ Keep tips strategic but not game-breaking. Don't reveal information players shou
     const basicTips: Record<GamePhase, GameplayTip[]> = {
       [GamePhase.DAY]: [
         {
-          message: "Pay attention to voting patterns and who players are defending or attacking.",
+          message:
+            "Pay attention to voting patterns and who players are defending or attacking.",
           relevance: 0.8,
-          timing: 'immediate'
+          timing: "immediate",
         },
         {
           message: "Look for inconsistencies in player stories and behavior.",
           relevance: 0.7,
-          timing: 'immediate'
-        }
+          timing: "immediate",
+        },
       ],
       [GamePhase.NIGHT]: [
         {
-          message: "Use this time to plan your strategy for the next day phase.",
+          message:
+            "Use this time to plan your strategy for the next day phase.",
           relevance: 0.6,
-          timing: 'immediate'
-        }
+          timing: "immediate",
+        },
       ],
       [GamePhase.VOTING]: [
         {
-          message: "Consider all the information shared during discussion before voting.",
+          message:
+            "Consider all the information shared during discussion before voting.",
           relevance: 0.9,
-          timing: 'immediate'
-        }
+          timing: "immediate",
+        },
       ],
-      [GamePhase.FINISHED]: []
+      [GamePhase.FINISHED]: [],
     };
 
     return basicTips[phase] || [];

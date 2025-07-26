@@ -31,7 +31,13 @@ export enum EventType {
   
   // A/B Testing events
   EXPERIMENT_VIEW = 'experiment_view',
-  EXPERIMENT_CONVERSION = 'experiment_conversion'
+  EXPERIMENT_CONVERSION = 'experiment_conversion',
+  
+  // Security events
+  SECURITY_EVENT = 'security_event',
+  ANTI_CHEAT_DETECTION = 'anti_cheat_detection',
+  CONSENT_RECORD = 'consent_record',
+  PRIVACY_SETTINGS_UPDATE = 'privacy_settings_update'
 }
 
 export enum MetricType {
