@@ -5,6 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
+    "admin:dev": "nodemon --exec ts-node src/admin/server.ts",
+    "admin:build": "tsc",
+    "admin:start": "node dist/admin/server.js",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",

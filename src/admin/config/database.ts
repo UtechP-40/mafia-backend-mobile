@@ -22,7 +22,6 @@ export async function connectAdminDatabase(): Promise<mongoose.Connection> {
       serverSelectionTimeoutMS: parseInt(process.env.ADMIN_DB_TIMEOUT || '5000'),
       socketTimeoutMS: parseInt(process.env.ADMIN_DB_SOCKET_TIMEOUT || '45000'),
       bufferCommands: false,
-      bufferMaxEntries: 0,
     });
 
     adminConnection.on('connected', () => {

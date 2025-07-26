@@ -14,7 +14,7 @@ export interface AdminUser {
 }
 
 export interface AuthenticatedAdminRequest extends Request {
-  user: AdminUser;
+  adminUser: AdminUser;
 }
 
 // Admin authentication middleware
@@ -27,7 +27,7 @@ export const adminAuthMiddleware = async (
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      logAdminSecurity('Admin auth attempt without token', req.ip, req.get('User-Agent'), {
+      logAdminSecurity('Admin auth attempt without token', req.ip || 'unknown', req.get('User-Agent'), {
         path: req.path,
         method: req.method
       });
@@ -47,7 +47,7 @@ export const adminAuthMiddleware = async (
     try {
       decoded = jwt.verify(token, adminJwtSecret);
     } catch (jwtError) {
-      logAdminSecurity('Admin invalid token attempt', req.ip, req.get('User-Agent'), {
+      logAdminSecurity('Admin invalid token attempt', req.ip || 'unknown', req.get('User-Agent'), {
         path: req.path,
         method: req.method,
         error: jwtError instanceof Error ? jwtError.message : 'Unknown JWT error'
@@ -63,7 +63,7 @@ export const adminAuthMiddleware = async (
 
     // Validate token payload
     if (!decoded.id || !decoded.role || !decoded.isAdmin) {
-      logAdminSecurity('Admin token with invalid payload', req.ip, req.get('User-Agent'), {
+      logAdminSecurity('Admin token with invalid payload', req.ip || 'unknown', req.get('User-Agent'), {
         path: req.path,
         method: req.method,
         tokenPayload: decoded
@@ -85,7 +85,7 @@ export const adminAuthMiddleware = async (
 
     // Check if admin user is active
     if (!adminUser.isActive) {
-      logAdminSecurity('Inactive admin user access attempt', req.ip, req.get('User-Agent'), {
+      logAdminSecurity('Inactive admin user access attempt', req.ip || 'unknown', req.get('User-Agent'), {
         userId: adminUser.id,
         username: adminUser.username,
         path: req.path,
@@ -95,7 +95,7 @@ export const adminAuthMiddleware = async (
     }
 
     // Attach admin user to request
-    (req as AuthenticatedAdminRequest).user = adminUser;
+    (req as AuthenticatedAdminRequest).adminUser = adminUser;
 
     // Log successful admin authentication
     adminLogger.info('Admin authenticated successfully', {
@@ -119,7 +119,7 @@ export const adminAuthMiddleware = async (
 export const requireAdminPermission = (permission: string) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const adminUser = (req as AuthenticatedAdminRequest).user;
+      const adminUser = (req as AuthenticatedAdminRequest).adminUser;
       
       if (!adminUser) {
         throw createAdminAuthError('Admin authentication required');
@@ -132,7 +132,7 @@ export const requireAdminPermission = (permission: string) => {
 
       // Check if user has the required permission
       if (!adminUser.permissions.includes(permission)) {
-        logAdminSecurity('Admin insufficient permissions', req.ip, req.get('User-Agent'), {
+        logAdminSecurity('Admin insufficient permissions', req.ip || 'unknown', req.get('User-Agent'), {
           userId: adminUser.id,
           username: adminUser.username,
           role: adminUser.role,
@@ -162,14 +162,14 @@ export const requireAdminRole = (roles: string | string[]) => {
   
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const adminUser = (req as AuthenticatedAdminRequest).user;
+      const adminUser = (req as AuthenticatedAdminRequest).adminUser;
       
       if (!adminUser) {
         throw createAdminAuthError('Admin authentication required');
       }
 
       if (!allowedRoles.includes(adminUser.role)) {
-        logAdminSecurity('Admin insufficient role', req.ip, req.get('User-Agent'), {
+        logAdminSecurity('Admin insufficient role', req.ip || 'unknown', req.get('User-Agent'), {
           userId: adminUser.id,
           username: adminUser.username,
           userRole: adminUser.role,

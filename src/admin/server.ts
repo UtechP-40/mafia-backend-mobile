@@ -92,7 +92,7 @@ app.use('/admin/api', adminAuthMiddleware, adminRoutes);
 app.use(adminErrorHandler);
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use((req, res) => {
   adminLogger.warn('Admin 404 - Route not found', {
     path: req.originalUrl,
     method: req.method,
