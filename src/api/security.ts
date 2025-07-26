@@ -288,7 +288,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/block-ip', authenticateToken, requireRole(['admin']), securityRateLimit, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { ip, reason, duration } = req.body;
+    const { ip, reason, duration = 3600000 } = req.body; // Default 1 hour
 
     if (!ip || !reason) {
       res.status(400).json({
@@ -297,6 +297,10 @@ router.post('/block-ip', authenticateToken, requireRole(['admin']), securityRate
       });
       return;
     }
+
+    // Import blockIP function
+    const { blockIP } = await import('../middleware/securityMiddleware');
+    blockIP(ip, reason, duration);
 
     // Log the IP blocking action
     await SecurityService.logSecurityEvent({
@@ -319,13 +323,133 @@ router.post('/block-ip', authenticateToken, requireRole(['admin']), securityRate
 
     res.status(200).json({
       success: true,
-      message: 'IP address blocked successfully'
+      message: 'IP address blocked successfully',
+      data: {
+        ip,
+        reason,
+        duration,
+        expiresAt: new Date(Date.now() + duration)
+      }
     });
   } catch (error) {
     logger.error('IP blocking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to block IP address'
+    });
+  }
+});
+
+/**
+ * DELETE /api/security/unblock-ip
+ * Unblock IP address (admin only)
+ */
+router.delete('/unblock-ip', authenticateToken, requireRole(['admin']), securityRateLimit, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ip } = req.body;
+
+    if (!ip) {
+      res.status(400).json({
+        success: false,
+        message: 'IP address is required'
+      });
+      return;
+    }
+
+    // Import unblockIP function
+    const { unblockIP } = await import('../middleware/securityMiddleware');
+    const wasBlocked = unblockIP(ip);
+
+    if (!wasBlocked) {
+      res.status(404).json({
+        success: false,
+        message: 'IP address was not blocked'
+      });
+      return;
+    }
+
+    // Log the IP unblocking action
+    await SecurityService.logSecurityEvent({
+      type: 'ip_unblocked',
+      ip,
+      userAgent: 'admin_action',
+      url: req.url,
+      userId: req.userId,
+      indicators: ['admin_unblock'],
+      timestamp: new Date(),
+      severity: 'medium'
+    });
+
+    logger.info('IP address unblocked by admin', {
+      unblockedIp: ip,
+      adminUserId: req.userId
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'IP address unblocked successfully'
+    });
+  } catch (error) {
+    logger.error('IP unblocking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unblock IP address'
+    });
+  }
+});
+
+/**
+ * GET /api/security/blocked-ips
+ * Get list of blocked IP addresses (admin only)
+ */
+router.get('/blocked-ips', authenticateToken, requireRole(['admin']), securityRateLimit, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Import getBlockedIPs function
+    const { getBlockedIPs } = await import('../middleware/securityMiddleware');
+    const blockedIPs = getBlockedIPs();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        blockedIPs,
+        total: blockedIPs.length
+      }
+    });
+  } catch (error) {
+    logger.error('Get blocked IPs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve blocked IP addresses'
+    });
+  }
+});
+
+/**
+ * POST /api/security/run-vulnerability-scan
+ * Run vulnerability assessment (admin only)
+ */
+router.post('/vulnerability-scan', authenticateToken, requireRole(['admin']), securityRateLimit, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Import and run vulnerability assessment
+    const { VulnerabilityAssessment } = await import('../scripts/vulnerability-assessment');
+    const assessment = new VulnerabilityAssessment();
+    
+    const results = await assessment.runAssessment();
+    const report = await assessment.generateReport(results);
+
+    res.status(200).json({
+      success: true,
+      message: 'Vulnerability assessment completed',
+      data: {
+        results,
+        report: JSON.parse(report)
+      }
+    });
+  } catch (error) {
+    logger.error('Vulnerability scan error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to run vulnerability assessment'
     });
   }
 });

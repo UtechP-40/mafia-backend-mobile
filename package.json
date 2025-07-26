@@ -10,6 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:security": "jest --testPathPattern=security",
+    "security:scan": "ts-node src/scripts/vulnerability-assessment.ts",
     "migrate": "ts-node src/migrations/runner.ts",
     "migrate:up": "ts-node src/migrations/runner.ts up",
     "migrate:down": "ts-node src/migrations/runner.ts down",
@@ -23,6 +25,7 @@
   "dependencies": {
     "@langchain/core": "^0.3.66",
     "@langchain/google-genai": "^0.2.15",
+    "@types/nodemailer": "^6.4.17",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
@@ -32,6 +35,7 @@
     "langchain": "^0.3.30",
     "mongoose": "^8.16.4",
     "morgan": "^1.10.1",
+    "nodemailer": "^7.0.5",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {

@@ -16,7 +16,8 @@ export const createRateLimit = (options: {
   const store = new Map<string, { count: number; resetTime: number; violations: number }>();
   
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (process.env.NODE_ENV === 'test') {
+    // Skip rate limiting in test environment unless explicitly testing it
+    if (process.env.NODE_ENV === 'test' && !process.env.TEST_RATE_LIMITING) {
       next();
       return;
     }
@@ -263,6 +264,190 @@ export const requestSizeLimit = (maxSize: number = 1024 * 1024) => { // 1MB defa
           message: 'Request entity too large',
           maxSize: `${maxSize} bytes`
         }
+      });
+      return;
+    }
+    
+    next();
+  };
+};
+
+/**
+ * HTTPS redirect middleware for production
+ */
+export const httpsRedirect = (req: Request, res: Response, next: NextFunction): void => {
+  if (process.env.NODE_ENV === 'production' && !req.secure && req.get('x-forwarded-proto') !== 'https') {
+    const httpsUrl = `https://${req.get('host')}${req.url}`;
+    res.redirect(301, httpsUrl);
+    return;
+  }
+  next();
+};
+
+/**
+ * IP blocking middleware
+ */
+const blockedIPs = new Set<string>();
+const ipBlockExpiry = new Map<string, number>();
+
+export const ipBlocking = (req: Request, res: Response, next: NextFunction): void => {
+  const clientIP = req.ip || 'unknown';
+  
+  // Clean up expired blocks
+  const now = Date.now();
+  for (const [ip, expiry] of ipBlockExpiry.entries()) {
+    if (now > expiry) {
+      blockedIPs.delete(ip);
+      ipBlockExpiry.delete(ip);
+    }
+  }
+  
+  // Check if IP is blocked
+  if (blockedIPs.has(clientIP)) {
+    const expiry = ipBlockExpiry.get(clientIP);
+    const remainingTime = expiry ? Math.ceil((expiry - now) / 1000) : 0;
+    
+    res.status(403).json({
+      success: false,
+      error: {
+        message: 'IP address blocked',
+        remainingTime,
+        reason: 'Security violation'
+      }
+    });
+    return;
+  }
+  
+  // Auto-block IPs with too many security violations
+  if (SecurityService.shouldBlockIP(clientIP)) {
+    blockIP(clientIP, 'Automatic block due to security violations', 3600000); // 1 hour
+    
+    res.status(403).json({
+      success: false,
+      error: {
+        message: 'IP address blocked due to security violations',
+        remainingTime: 3600
+      }
+    });
+    return;
+  }
+  
+  next();
+};
+
+/**
+ * Block an IP address
+ */
+export const blockIP = (ip: string, reason: string, duration: number = 3600000): void => {
+  blockedIPs.add(ip);
+  ipBlockExpiry.set(ip, Date.now() + duration);
+  
+  logger.warn(`IP blocked: ${ip}`, { reason, duration });
+};
+
+/**
+ * Unblock an IP address
+ */
+export const unblockIP = (ip: string): boolean => {
+  const wasBlocked = blockedIPs.has(ip);
+  blockedIPs.delete(ip);
+  ipBlockExpiry.delete(ip);
+  
+  if (wasBlocked) {
+    logger.info(`IP unblocked: ${ip}`);
+  }
+  
+  return wasBlocked;
+};
+
+/**
+ * Get blocked IPs list
+ */
+export const getBlockedIPs = (): Array<{ ip: string; expiresAt: number }> => {
+  const result = [];
+  for (const ip of blockedIPs) {
+    const expiresAt = ipBlockExpiry.get(ip) || 0;
+    result.push({ ip, expiresAt });
+  }
+  return result;
+};
+
+/**
+ * Advanced security headers middleware
+ */
+export const advancedSecurityHeaders = (req: Request, res: Response, next: NextFunction): void => {
+  // Strict Transport Security (HSTS)
+  if (req.secure || req.get('x-forwarded-proto') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  
+  // Certificate Transparency
+  res.setHeader('Expect-CT', 'max-age=86400, enforce');
+  
+  // Feature Policy / Permissions Policy
+  res.setHeader('Permissions-Policy', [
+    'geolocation=()',
+    'microphone=()',
+    'camera=()',
+    'payment=()',
+    'usb=()',
+    'magnetometer=()',
+    'gyroscope=()',
+    'speaker=()',
+    'vibrate=()',
+    'fullscreen=(self)',
+    'sync-xhr=()'
+  ].join(', '));
+  
+  // Cross-Origin policies
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  
+  // Additional security headers
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('X-Download-Options', 'noopen');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  
+  next();
+};
+
+/**
+ * Request signature verification middleware
+ */
+export const verifyRequestSignature = (secret: string) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const signature = req.get('x-signature');
+    const timestamp = req.get('x-timestamp');
+    
+    if (!signature || !timestamp) {
+      next(); // Optional signature verification
+      return;
+    }
+    
+    // Verify timestamp (prevent replay attacks)
+    const requestTime = parseInt(timestamp);
+    const now = Date.now();
+    if (Math.abs(now - requestTime) > 300000) { // 5 minutes tolerance
+      res.status(401).json({
+        success: false,
+        error: { message: 'Request timestamp expired' }
+      });
+      return;
+    }
+    
+    // Verify signature
+    const crypto = require('crypto');
+    const payload = `${req.method}${req.url}${timestamp}${JSON.stringify(req.body || {})}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+    
+    if (signature !== expectedSignature) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid request signature' }
       });
       return;
     }

@@ -22,6 +22,8 @@ describe('Security Middleware', () => {
   let mockNext: NextFunction;
 
   beforeEach(() => {
+    // Enable rate limiting for tests
+    process.env.TEST_RATE_LIMITING = 'true';
     mockReq = {
       ip: '127.0.0.1',
       get: jest.fn(),
@@ -40,6 +42,12 @@ describe('Security Middleware', () => {
     };
     
     mockNext = jest.fn();
+  });
+
+  afterEach(() => {
+    // Clean up test environment
+    delete process.env.TEST_RATE_LIMITING;
+    jest.clearAllMocks();
   });
 
   describe('createRateLimit', () => {
@@ -207,7 +215,7 @@ describe('Security Middleware', () => {
 
     it('should handle non-object inputs', () => {
       mockReq.body = 'string body';
-      mockReq.query = null;
+      mockReq.query = undefined;
       mockReq.params = undefined;
 
       expect(() => {

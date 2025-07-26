@@ -46,7 +46,8 @@ export class SecurityService {
   private static readonly SQL_INJECTION_PATTERNS = [
     /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)/gi,
     /(\b(OR|AND)\s+\d+\s*=\s*\d+)/gi,
-    /('|(\\')|(;)|(--)|(\s)|(\/\*)|(\*\/))/gi,
+    /(';|';\s*DROP|';\s*DELETE|';\s*INSERT|';\s*UPDATE)/gi,
+    /(--|\*\/|\/\*)/gi,
     /(\b(WAITFOR|DELAY)\b)/gi
   ];
 
@@ -90,7 +91,11 @@ export class SecurityService {
       .replace(/&gt;/g, '')
       .replace(/&#x3C;/g, '')
       .replace(/&#x3E;/g, '')
-      .replace(/\0/g, ''); // Remove null bytes
+      .replace(/\0/g, '') // Remove null bytes
+      .replace(/(';|';\s*DROP|';\s*DELETE|';\s*INSERT|';\s*UPDATE)/gi, '') // Remove SQL injection patterns
+      .replace(/(--|\*\/|\/\*)/g, '') // Remove SQL comment patterns
+      .replace(/\.\.\//g, '') // Remove path traversal patterns
+      .replace(/\.\.\\/g, ''); // Remove Windows path traversal patterns
   }
 
   /**

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import { Player, IPlayer } from '../models/Player';
+import { EmailService } from './EmailService';
 
 // JWT payload interface
 export interface JWTPayload {
@@ -150,6 +151,17 @@ export class AuthService {
       }
       player.refreshTokens.push(refreshToken);
       await player.save();
+
+      // Send welcome email if email is provided
+      if (data.email) {
+        try {
+          const gameUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+          await EmailService.sendWelcomeEmail(data.email, data.username, gameUrl);
+        } catch (emailError) {
+          console.error('Failed to send welcome email:', emailError);
+          // Don't fail registration if email fails
+        }
+      }
 
       // Remove password from response
       const playerResponse = player.toObject();

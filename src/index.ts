@@ -1,10 +1,12 @@
 import express from "express";
 import { createServer } from "http";
+import { createServer as createHttpsServer } from "https";
 import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import fs from "fs";
 import { connectDatabase } from "./utils/database";
 import { errorHandler } from "./middleware/errorHandler";
 import {
@@ -18,8 +20,12 @@ import {
   createRateLimit,
   sanitizeInput,
   securityHeaders,
+  advancedSecurityHeaders,
   suspiciousActivityDetection,
-  requestSizeLimit
+  requestSizeLimit,
+  httpsRedirect,
+  ipBlocking,
+  verifyRequestSignature
 } from "./middleware/securityMiddleware";
 import { authRoutes } from "./api/auth";
 import { playerRoutes } from "./api/players";
@@ -28,6 +34,7 @@ import { gameRoutes } from "./api/games";
 import matchmakingRoutes from "./api/matchmaking";
 import aiRoutes from "./api/ai";
 import analyticsRoutes from "./api/analytics";
+import emailRoutes from "./api/email";
 import { gdprRoutes } from "./api/gdpr";
 import { securityRoutes } from "./api/security";
 import { SocketService } from "./services/SocketService";
@@ -39,18 +46,61 @@ import { GDPRService } from "./services/GDPRService";
 dotenv.config();
 
 const app = express();
-const server = createServer(app);
+
+// SSL/TLS Configuration
+let server: any;
+if (process.env.NODE_ENV === 'production' && process.env.SSL_CERT && process.env.SSL_KEY) {
+  try {
+    const httpsOptions = {
+      key: fs.readFileSync(process.env.SSL_KEY),
+      cert: fs.readFileSync(process.env.SSL_CERT),
+      // Additional security options
+      secureProtocol: 'TLSv1_2_method',
+      ciphers: [
+        'ECDHE-RSA-AES128-GCM-SHA256',
+        'ECDHE-RSA-AES256-GCM-SHA384',
+        'ECDHE-RSA-AES128-SHA256',
+        'ECDHE-RSA-AES256-SHA384'
+      ].join(':'),
+      honorCipherOrder: true
+    };
+    
+    server = createHttpsServer(httpsOptions, app);
+    console.log('HTTPS server configured with SSL/TLS');
+  } catch (error) {
+    console.error('Failed to load SSL certificates, falling back to HTTP:', error);
+    server = createServer(app);
+  }
+} else {
+  server = createServer(app);
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('WARNING: Running in production without SSL/TLS encryption');
+  }
+}
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "*",
+    origin: process.env.NODE_ENV === 'production' 
+      ? process.env.FRONTEND_URL?.split(',') || false
+      : "*",
     methods: ["GET", "POST"],
+    credentials: true
   },
+  // Enhanced security for Socket.io
+  allowEIO3: false, // Disable older Engine.IO versions
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 443;
 
 // Security middleware (applied first)
+app.use(httpsRedirect); // Redirect HTTP to HTTPS in production
+app.use(ipBlocking); // Block malicious IPs
 app.use(securityHeaders);
+app.use(advancedSecurityHeaders);
 app.use(suspiciousActivityDetection);
 app.use(requestSizeLimit(5 * 1024 * 1024)); // 5MB limit
 
@@ -133,6 +183,7 @@ app.use("/api/games", gameRoutes);
 app.use("/api/matchmaking", matchmakingRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/email", emailRoutes);
 app.use("/api/gdpr", gdprRoutes);
 app.use("/api/security", securityRoutes);
 
