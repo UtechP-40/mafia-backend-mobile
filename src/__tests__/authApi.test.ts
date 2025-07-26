@@ -3,12 +3,7 @@ import express from 'express';
 import { authRoutes } from '../api/auth';
 import { Player } from '../models/Player';
 import { AuthService } from '../services/AuthService';
-import { beforeEach } from 'node:test';
-import { beforeEach } from 'node:test';
-import { beforeEach } from 'node:test';
-import { beforeEach } from 'node:test';
-import { beforeEach } from 'node:test';
-import { beforeEach } from 'node:test';
+import { connectDB, disconnectDB, clearDB } from './setup';
 
 // Create test app
 const app = express();
@@ -16,6 +11,18 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 
 describe('Authentication API', () => {
+  beforeAll(async () => {
+    await connectDB();
+  });
+
+  afterAll(async () => {
+    await disconnectDB();
+  });
+
+  beforeEach(async () => {
+    await clearDB();
+  });
+
   const testUser = {
     username: 'testuser',
     email: 'test@example.com',
