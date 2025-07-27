@@ -10,6 +10,7 @@ import { adminErrorHandler } from './middleware/errorHandler';
 import { adminAuthMiddleware } from './middleware/auth';
 import { AdminEmailService } from './services/AdminEmailService';
 import { SchedulerService } from './services/SchedulerService';
+import { initializeAdminWebSocket } from './services/WebSocketService';
 import adminRoutes from './routes';
 
 // Load environment variables
@@ -125,6 +126,10 @@ async function startAdminServer() {
         timestamp: new Date().toISOString()
       });
     });
+
+    // Initialize WebSocket service
+    const webSocketService = initializeAdminWebSocket(server);
+    adminLogger.info('Admin WebSocket service initialized');
 
     // Graceful shutdown handling
     process.on('SIGTERM', () => {

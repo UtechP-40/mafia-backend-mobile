@@ -6,6 +6,10 @@ import { Permission } from '../models/SuperUser';
 import authRoutes from './auth';
 import approvalRoutes from './approvals';
 import databaseRoutes from './database';
+import analyticsRoutes from './analytics';
+import reportsRoutes from './reports';
+import apiTestingRoutes from './apiTesting';
+import automatedTestingRoutes from './automatedTesting';
 
 const router = Router();
 
@@ -17,6 +21,18 @@ router.use('/approvals', adminAuthMiddleware, approvalRoutes);
 
 // Mount database routes (authentication required)
 router.use('/database', adminAuthMiddleware, databaseRoutes);
+
+// Mount analytics routes (authentication required)
+router.use('/analytics', analyticsRoutes);
+
+// Mount reports routes (authentication required)
+router.use('/reports', reportsRoutes);
+
+// Mount API testing routes (authentication required)
+router.use('/api-testing', adminAuthMiddleware, apiTestingRoutes);
+
+// Mount automated testing routes (authentication required)
+router.use('/automated-testing', adminAuthMiddleware, automatedTestingRoutes);
 
 // Admin dashboard endpoint (requires authentication)
 router.get('/dashboard', adminAuthMiddleware, adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {

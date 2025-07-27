@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { Parser } from 'json2csv';
 
 // Import main game models
-import { Player, Game, Room, ChatMessage, Analytics } from '../../models';
+import { Player, Game, Room, ChatMessage, AnalyticsEvent } from '../../models';
 
 // Collection metadata interface
 export interface CollectionMetadata {
@@ -46,7 +46,7 @@ export class DatabaseOperationsService {
     games: Game,
     rooms: Room,
     chatmessages: ChatMessage,
-    analytics: Analytics
+    analytics: AnalyticsEvent
   };
 
   /**
@@ -58,14 +58,27 @@ export class DatabaseOperationsService {
       
       for (const [name, model] of Object.entries(this.COLLECTIONS)) {
         try {
-          const stats = await mongoose.connection.db?.collection(model.collection.name).stats();
-          const indexes = await model.collection.getIndexes();
+          const [count, indexes] = await Promise.all([
+            model.countDocuments(),
+            model.collection.getIndexes()
+          ]);
+          
+          // Try to get collection stats, fallback if not available
+          let stats: any = {};
+          try {
+            const collection = mongoose.connection.db?.collection(model.collection.name) as any;
+            const collectionStats = await collection?.stats();
+            stats = collectionStats || {};
+          } catch (statsError) {
+            // Stats not available, use defaults
+            stats = { size: 0, avgObjSize: 0 };
+          }
           
           collections.push({
             name,
-            count: stats?.count || 0,
-            size: stats?.size || 0,
-            avgObjSize: stats?.avgObjSize || 0,
+            count,
+            size: stats.size || 0,
+            avgObjSize: stats.avgObjSize || 0,
             indexes: Object.keys(indexes || {}),
             schema: this.getSchemaInfo(model)
           });
@@ -407,26 +420,45 @@ export class DatabaseOperationsService {
     try {
       const model = this.getModel(collectionName);
       
-      const [stats, indexes, sampleDoc] = await Promise.all([
-        mongoose.connection.db?.collection(model.collection.name).stats(),
+      // Get basic info that's always available
+      const [count, indexes, sampleDoc] = await Promise.all([
+        model.countDocuments(),
         model.collection.getIndexes(),
         model.findOne().lean()
       ]);
       
+      // Try to get collection stats, fallback if not available
+      let stats: any = {};
+      try {
+        const collection = mongoose.connection.db?.collection(model.collection.name) as any;
+        const collectionStats = await collection?.stats();
+        stats = collectionStats || {};
+      } catch (statsError) {
+        // Stats not available, use defaults
+        stats = { 
+          count,
+          size: 0, 
+          avgObjSize: 0,
+          storageSize: 0,
+          totalIndexSize: 0,
+          indexSizes: {}
+        };
+      }
+      
       return {
         name: collectionName,
         stats: {
-          count: stats?.count || 0,
-          size: stats?.size || 0,
-          avgObjSize: stats?.avgObjSize || 0,
-          storageSize: stats?.storageSize || 0,
-          totalIndexSize: stats?.totalIndexSize || 0,
-          indexSizes: stats?.indexSizes || {}
+          count: stats.count || count,
+          size: stats.size || 0,
+          avgObjSize: stats.avgObjSize || 0,
+          storageSize: stats.storageSize || 0,
+          totalIndexSize: stats.totalIndexSize || 0,
+          indexSizes: stats.indexSizes || {}
         },
         indexes: Object.entries(indexes || {}).map(([name, spec]) => ({
           name,
           spec,
-          size: stats?.indexSizes?.[name] || 0
+          size: stats.indexSizes?.[name] || 0
         })),
         schema: this.getSchemaInfo(model),
         sampleDocument: sampleDoc

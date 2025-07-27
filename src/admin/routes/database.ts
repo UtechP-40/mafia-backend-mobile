@@ -73,10 +73,11 @@ router.get('/collections/:name',
       try {
         options.sort = JSON.parse(sort as string);
       } catch (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Invalid sort parameter format'
         });
+        return;
       }
     }
     
@@ -84,10 +85,11 @@ router.get('/collections/:name',
       try {
         options.filter = JSON.parse(filter as string);
       } catch (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Invalid filter parameter format'
         });
+        return;
       }
     }
     
@@ -129,10 +131,11 @@ router.post('/collections/:name',
     const data = req.body;
     
     if (!data || typeof data !== 'object') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid document data'
       });
+      return;
     }
     
     const document = await DatabaseOperationsService.createDocument(name, data);
@@ -163,10 +166,11 @@ router.put('/collections/:name/:id',
     const { upsert = false } = req.query;
     
     if (!data || typeof data !== 'object') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid document data'
       });
+      return;
     }
     
     const document = await DatabaseOperationsService.updateDocument(
@@ -233,10 +237,11 @@ router.post('/collections/:name/bulk',
     const { operations } = req.body;
     
     if (!Array.isArray(operations) || operations.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid operations array'
       });
+      return;
     }
     
     const result = await DatabaseOperationsService.bulkOperations(name, operations);
@@ -277,10 +282,11 @@ router.post('/collections/:name/aggregate',
     const { pipeline } = req.body;
     
     if (!Array.isArray(pipeline) || pipeline.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid aggregation pipeline'
       });
+      return;
     }
     
     const result = await DatabaseOperationsService.executeAggregation(name, pipeline);
@@ -342,10 +348,11 @@ router.get('/collections/:name/export',
     
     // Validate format
     if (!['json', 'csv', 'xlsx'].includes(format as string)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid export format. Supported: json, csv, xlsx'
       });
+      return;
     }
     
     const options: any = {
@@ -356,10 +363,11 @@ router.get('/collections/:name/export',
       try {
         options.filter = JSON.parse(filter as string);
       } catch (error) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Invalid filter parameter format'
         });
+        return;
       }
     }
     
@@ -423,10 +431,11 @@ router.post('/restore',
   upload.single('backup'),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     if (!req.file) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'No backup file provided'
       });
+      return;
     }
     
     const { overwrite = false } = req.body;
@@ -435,10 +444,11 @@ router.post('/restore',
     try {
       backupData = JSON.parse(req.file.buffer.toString());
     } catch (error) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Invalid backup file format'
       });
+      return;
     }
     
     const result = await DatabaseOperationsService.restoreBackup(backupData, {
@@ -477,10 +487,11 @@ router.post('/query-builder',
     } = req.body;
     
     if (!collection) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Collection name is required'
       });
+      return;
     }
     
     const options = {
