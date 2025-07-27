@@ -2,13 +2,15 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { adminLogger, logAdminSecurity } from '../config/logger';
 import { createAdminAuthError, AdminOperationalError } from './errorHandler';
+import { AdminAuthService, AdminJWTPayload } from '../services/AdminAuthService';
+import { Permission, SuperUserStatus } from '../models/SuperUser';
 
 export interface AdminUser {
   id: string;
   username: string;
   email: string;
-  role: 'super_admin' | 'admin' | 'moderator';
-  permissions: string[];
+  permissions: Permission[];
+  status: SuperUserStatus;
   isActive: boolean;
   lastLogin?: Date;
 }
@@ -36,33 +38,18 @@ export const adminAuthMiddleware = async (
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify JWT token
-    const adminJwtSecret = process.env.ADMIN_JWT_SECRET || process.env.JWT_ACCESS_SECRET;
-    if (!adminJwtSecret) {
-      adminLogger.error('Admin JWT secret not configured');
-      throw new AdminOperationalError('Admin authentication configuration error', 500, 'ADMIN_CONFIG_ERROR');
-    }
-
-    let decoded: any;
-    try {
-      decoded = jwt.verify(token, adminJwtSecret);
-    } catch (jwtError) {
+    // Verify JWT token using AdminAuthService
+    const decoded = AdminAuthService.verifyAccessToken(token);
+    if (!decoded) {
       logAdminSecurity('Admin invalid token attempt', req.ip || 'unknown', req.get('User-Agent'), {
         path: req.path,
-        method: req.method,
-        error: jwtError instanceof Error ? jwtError.message : 'Unknown JWT error'
+        method: req.method
       });
-      
-      if (jwtError instanceof jwt.TokenExpiredError) {
-        throw new AdminOperationalError('Admin token expired', 401, 'ADMIN_TOKEN_EXPIRED');
-      } else if (jwtError instanceof jwt.JsonWebTokenError) {
-        throw new AdminOperationalError('Invalid admin token', 401, 'ADMIN_INVALID_TOKEN');
-      }
-      throw createAdminAuthError('Admin token verification failed');
+      throw new AdminOperationalError('Invalid or expired admin token', 401, 'ADMIN_INVALID_TOKEN');
     }
 
     // Validate token payload
-    if (!decoded.id || !decoded.role || !decoded.isAdmin) {
+    if (!decoded.userId || !decoded.isAdmin) {
       logAdminSecurity('Admin token with invalid payload', req.ip || 'unknown', req.get('User-Agent'), {
         path: req.path,
         method: req.method,
@@ -71,28 +58,51 @@ export const adminAuthMiddleware = async (
       throw createAdminAuthError('Invalid admin token payload');
     }
 
-    // TODO: In a real implementation, you would fetch the user from the admin database
-    // For now, we'll use the token payload directly
-    const adminUser: AdminUser = {
-      id: decoded.id,
-      username: decoded.username || 'admin',
-      email: decoded.email || 'admin@example.com',
-      role: decoded.role,
-      permissions: decoded.permissions || [],
-      isActive: decoded.isActive !== false,
-      lastLogin: decoded.lastLogin ? new Date(decoded.lastLogin) : undefined
-    };
-
-    // Check if admin user is active
-    if (!adminUser.isActive) {
-      logAdminSecurity('Inactive admin user access attempt', req.ip || 'unknown', req.get('User-Agent'), {
-        userId: adminUser.id,
-        username: adminUser.username,
+    // Fetch current user from database to ensure account is still valid
+    const dbUser = await AdminAuthService.getAdminUserById(decoded.userId);
+    if (!dbUser) {
+      logAdminSecurity('Admin token for non-existent user', req.ip || 'unknown', req.get('User-Agent'), {
+        userId: decoded.userId,
         path: req.path,
         method: req.method
       });
-      throw createAdminAuthError('Admin account is inactive');
+      throw createAdminAuthError('Admin user not found');
     }
+
+    // Check if admin user account is approved and active
+    if (dbUser.status !== SuperUserStatus.APPROVED) {
+      logAdminSecurity('Admin access attempt with non-approved account', req.ip || 'unknown', req.get('User-Agent'), {
+        userId: dbUser._id.toString(),
+        username: dbUser.username,
+        status: dbUser.status,
+        path: req.path,
+        method: req.method
+      });
+      throw createAdminAuthError('Admin account is not approved');
+    }
+
+    // Check if account is locked
+    if (dbUser.isLocked) {
+      logAdminSecurity('Admin access attempt on locked account', req.ip || 'unknown', req.get('User-Agent'), {
+        userId: dbUser._id.toString(),
+        username: dbUser.username,
+        lockUntil: dbUser.lockUntil,
+        path: req.path,
+        method: req.method
+      });
+      throw createAdminAuthError('Admin account is locked');
+    }
+
+    // Create admin user object for request
+    const adminUser: AdminUser = {
+      id: dbUser._id.toString(),
+      username: dbUser.username,
+      email: dbUser.email,
+      permissions: dbUser.permissions,
+      status: dbUser.status,
+      isActive: dbUser.status === SuperUserStatus.APPROVED,
+      lastLogin: dbUser.lastLogin
+    };
 
     // Attach admin user to request
     (req as AuthenticatedAdminRequest).adminUser = adminUser;
@@ -101,7 +111,7 @@ export const adminAuthMiddleware = async (
     adminLogger.info('Admin authenticated successfully', {
       userId: adminUser.id,
       username: adminUser.username,
-      role: adminUser.role,
+      permissions: adminUser.permissions,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       path: req.path,
@@ -116,7 +126,7 @@ export const adminAuthMiddleware = async (
 };
 
 // Permission checking middleware factory
-export const requireAdminPermission = (permission: string) => {
+export const requireAdminPermission = (permission: Permission) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const adminUser = (req as AuthenticatedAdminRequest).adminUser;
@@ -126,7 +136,7 @@ export const requireAdminPermission = (permission: string) => {
       }
 
       // Super admins have all permissions
-      if (adminUser.role === 'super_admin') {
+      if (adminUser.permissions.includes(Permission.SUPER_ADMIN)) {
         return next();
       }
 
@@ -135,7 +145,6 @@ export const requireAdminPermission = (permission: string) => {
         logAdminSecurity('Admin insufficient permissions', req.ip || 'unknown', req.get('User-Agent'), {
           userId: adminUser.id,
           username: adminUser.username,
-          role: adminUser.role,
           requiredPermission: permission,
           userPermissions: adminUser.permissions,
           path: req.path,
@@ -156,10 +165,8 @@ export const requireAdminPermission = (permission: string) => {
   };
 };
 
-// Role checking middleware factory
-export const requireAdminRole = (roles: string | string[]) => {
-  const allowedRoles = Array.isArray(roles) ? roles : [roles];
-  
+// Multiple permissions checking middleware factory
+export const requireAnyAdminPermission = (permissions: Permission[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const adminUser = (req as AuthenticatedAdminRequest).adminUser;
@@ -168,20 +175,71 @@ export const requireAdminRole = (roles: string | string[]) => {
         throw createAdminAuthError('Admin authentication required');
       }
 
-      if (!allowedRoles.includes(adminUser.role)) {
-        logAdminSecurity('Admin insufficient role', req.ip || 'unknown', req.get('User-Agent'), {
+      // Super admins have all permissions
+      if (adminUser.permissions.includes(Permission.SUPER_ADMIN)) {
+        return next();
+      }
+
+      // Check if user has any of the required permissions
+      const hasPermission = permissions.some(permission => adminUser.permissions.includes(permission));
+      
+      if (!hasPermission) {
+        logAdminSecurity('Admin insufficient permissions (any)', req.ip || 'unknown', req.get('User-Agent'), {
           userId: adminUser.id,
           username: adminUser.username,
-          userRole: adminUser.role,
-          requiredRoles: allowedRoles,
+          requiredPermissions: permissions,
+          userPermissions: adminUser.permissions,
           path: req.path,
           method: req.method
         });
         throw new AdminOperationalError(
-          `Admin role must be one of: ${allowedRoles.join(', ')}`,
+          `Admin requires one of the following permissions: ${permissions.join(', ')}`,
           403,
-          'ADMIN_INSUFFICIENT_ROLE',
-          { requiredRoles: allowedRoles, userRole: adminUser.role }
+          'ADMIN_INSUFFICIENT_PERMISSIONS',
+          { requiredPermissions: permissions }
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+// All permissions checking middleware factory
+export const requireAllAdminPermissions = (permissions: Permission[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const adminUser = (req as AuthenticatedAdminRequest).adminUser;
+      
+      if (!adminUser) {
+        throw createAdminAuthError('Admin authentication required');
+      }
+
+      // Super admins have all permissions
+      if (adminUser.permissions.includes(Permission.SUPER_ADMIN)) {
+        return next();
+      }
+
+      // Check if user has all required permissions
+      const missingPermissions = permissions.filter(permission => !adminUser.permissions.includes(permission));
+      
+      if (missingPermissions.length > 0) {
+        logAdminSecurity('Admin insufficient permissions (all)', req.ip || 'unknown', req.get('User-Agent'), {
+          userId: adminUser.id,
+          username: adminUser.username,
+          requiredPermissions: permissions,
+          missingPermissions: missingPermissions,
+          userPermissions: adminUser.permissions,
+          path: req.path,
+          method: req.method
+        });
+        throw new AdminOperationalError(
+          `Admin missing required permissions: ${missingPermissions.join(', ')}`,
+          403,
+          'ADMIN_INSUFFICIENT_PERMISSIONS',
+          { requiredPermissions: permissions, missingPermissions }
         );
       }
 

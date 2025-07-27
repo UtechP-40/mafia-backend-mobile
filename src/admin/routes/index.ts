@@ -1,18 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { adminAsyncHandler } from '../middleware/errorHandler';
-import { requireAdminRole, requireAdminPermission, AuthenticatedAdminRequest } from '../middleware/auth';
+import { requireAdminPermission, AuthenticatedAdminRequest, adminAuthMiddleware } from '../middleware/auth';
 import { adminLogger } from '../config/logger';
+import { Permission } from '../models/SuperUser';
+import authRoutes from './auth';
+import approvalRoutes from './approvals';
 
 const router = Router();
 
-// Admin dashboard endpoint
-router.get('/dashboard', adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+// Mount auth routes (no authentication required for these)
+router.use('/auth', authRoutes);
+
+// Mount approval routes (authentication required)
+router.use('/approvals', adminAuthMiddleware, approvalRoutes);
+
+// Admin dashboard endpoint (requires authentication)
+router.get('/dashboard', adminAuthMiddleware, adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
   const adminUser = req.adminUser;
   
   adminLogger.info('Admin dashboard accessed', {
     userId: adminUser.id,
     username: adminUser.username,
-    role: adminUser.role
+    permissions: adminUser.permissions
   });
 
   res.json({
@@ -20,8 +29,8 @@ router.get('/dashboard', adminAsyncHandler(async (req: AuthenticatedAdminRequest
     user: {
       id: adminUser.id,
       username: adminUser.username,
-      role: adminUser.role,
-      permissions: adminUser.permissions
+      permissions: adminUser.permissions,
+      status: adminUser.status
     },
     timestamp: new Date().toISOString(),
     stats: {
@@ -33,9 +42,10 @@ router.get('/dashboard', adminAsyncHandler(async (req: AuthenticatedAdminRequest
   });
 }));
 
-// Admin system info endpoint (super admin only)
+// Admin system info endpoint (requires system monitoring permission)
 router.get('/system', 
-  requireAdminRole('super_admin'),
+  adminAuthMiddleware,
+  requireAdminPermission(Permission.SYSTEM_MONITOR),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
     
@@ -63,7 +73,8 @@ router.get('/system',
 
 // Admin users management endpoint (requires user management permission)
 router.get('/users',
-  requireAdminPermission('manage_users'),
+  adminAuthMiddleware,
+  requireAdminPermission(Permission.USER_READ),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
     
@@ -83,9 +94,10 @@ router.get('/users',
   })
 );
 
-// Admin logs endpoint (requires system access permission)
+// Admin logs endpoint (requires analytics read permission)
 router.get('/logs',
-  requireAdminPermission('view_logs'),
+  adminAuthMiddleware,
+  requireAdminPermission(Permission.ANALYTICS_READ),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
     

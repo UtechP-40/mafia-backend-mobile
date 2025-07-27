@@ -8,6 +8,8 @@ import { connectAdminDatabase } from './config/database';
 import { adminLogger } from './config/logger';
 import { adminErrorHandler } from './middleware/errorHandler';
 import { adminAuthMiddleware } from './middleware/auth';
+import { AdminEmailService } from './services/AdminEmailService';
+import { SchedulerService } from './services/SchedulerService';
 import adminRoutes from './routes';
 
 // Load environment variables
@@ -85,8 +87,8 @@ app.get('/admin/health', (req, res) => {
   });
 });
 
-// Admin routes with authentication middleware
-app.use('/admin/api', adminAuthMiddleware, adminRoutes);
+// Admin routes (auth routes don't require authentication, others do)
+app.use('/admin/api', adminRoutes);
 
 // Error handling middleware (must be last)
 app.use(adminErrorHandler);
@@ -110,6 +112,12 @@ async function startAdminServer() {
     // Connect to admin database
     await connectAdminDatabase();
     
+    // Initialize email service
+    AdminEmailService.initialize();
+    
+    // Initialize scheduler service
+    SchedulerService.initialize();
+    
     const server = app.listen(PORT, () => {
       adminLogger.info(`Admin portal server running on port ${PORT}`, {
         port: PORT,
@@ -121,6 +129,8 @@ async function startAdminServer() {
     // Graceful shutdown handling
     process.on('SIGTERM', () => {
       adminLogger.info('SIGTERM received, shutting down admin server gracefully');
+      AdminEmailService.shutdown();
+      SchedulerService.shutdown();
       server.close(() => {
         adminLogger.info('Admin server closed');
         process.exit(0);
@@ -129,6 +139,8 @@ async function startAdminServer() {
 
     process.on('SIGINT', () => {
       adminLogger.info('SIGINT received, shutting down admin server gracefully');
+      AdminEmailService.shutdown();
+      SchedulerService.shutdown();
       server.close(() => {
         adminLogger.info('Admin server closed');
         process.exit(0);
