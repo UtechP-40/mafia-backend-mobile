@@ -702,7 +702,7 @@ export class ApiTestingService {
       if (filters.success !== undefined) {
         results = results.filter(r => r.success === filters.success);
       }
-      if (filters.limit) {
+      if (filters.limit !== undefined && filters.limit >= 0) {
         results = results.slice(0, filters.limit);
       }
     }

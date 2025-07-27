@@ -41,6 +41,7 @@ import { SocketService } from "./services/SocketService";
 import { analyticsService } from "./services/AnalyticsService";
 import { AntiCheatService } from "./services/AntiCheatService";
 import { GDPRService } from "./services/GDPRService";
+import SocketMonitoringService from "./admin/services/SocketMonitoringService";
 
 // Load environment variables
 dotenv.config();
@@ -190,6 +191,10 @@ app.use("/api/security", securityRoutes);
 // Initialize Socket.io service
 const socketService = new SocketService(io);
 
+// Initialize Socket Monitoring Service
+const socketMonitoringService = SocketMonitoringService.getInstance();
+socketMonitoringService.attachToSocketServer(io);
+
 // Set up session cleanup interval (every 5 minutes)
 setInterval(() => {
   socketService.cleanupInactiveSessions(30); // 30 minute timeout
@@ -225,6 +230,25 @@ setInterval(() => {
   AntiCheatService.cleanupOldData();
   GDPRService.cleanupExpiredRequests();
 }, 60 * 60 * 1000); // Every hour
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  socketMonitoringService.shutdown();
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  socketMonitoringService.shutdown();
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
 
 // Error handling middleware (must be last)
 app.use(errorTrackingMiddleware);

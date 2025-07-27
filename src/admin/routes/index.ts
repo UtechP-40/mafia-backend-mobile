@@ -10,6 +10,7 @@ import analyticsRoutes from './analytics';
 import reportsRoutes from './reports';
 import apiTestingRoutes from './apiTesting';
 import automatedTestingRoutes from './automatedTesting';
+import socketMonitoringRoutes from './socketMonitoring';
 
 const router = Router();
 
@@ -33,6 +34,9 @@ router.use('/api-testing', adminAuthMiddleware, apiTestingRoutes);
 
 // Mount automated testing routes (authentication required)
 router.use('/automated-testing', adminAuthMiddleware, automatedTestingRoutes);
+
+// Mount socket monitoring routes (authentication required)
+router.use('/socket-monitoring', adminAuthMiddleware, socketMonitoringRoutes);
 
 // Admin dashboard endpoint (requires authentication)
 router.get('/dashboard', adminAuthMiddleware, adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
