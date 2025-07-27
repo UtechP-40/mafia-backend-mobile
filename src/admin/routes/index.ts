@@ -5,6 +5,7 @@ import { adminLogger } from '../config/logger';
 import { Permission } from '../models/SuperUser';
 import authRoutes from './auth';
 import approvalRoutes from './approvals';
+import databaseRoutes from './database';
 
 const router = Router();
 
@@ -13,6 +14,9 @@ router.use('/auth', authRoutes);
 
 // Mount approval routes (authentication required)
 router.use('/approvals', adminAuthMiddleware, approvalRoutes);
+
+// Mount database routes (authentication required)
+router.use('/database', adminAuthMiddleware, databaseRoutes);
 
 // Admin dashboard endpoint (requires authentication)
 router.get('/dashboard', adminAuthMiddleware, adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
