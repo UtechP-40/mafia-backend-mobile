@@ -42,6 +42,8 @@ import { analyticsService } from "./services/AnalyticsService";
 import { AntiCheatService } from "./services/AntiCheatService";
 import { GDPRService } from "./services/GDPRService";
 import SocketMonitoringService from "./admin/services/SocketMonitoringService";
+import { SystemMonitoringService } from "./services/SystemMonitoringService";
+import { loggingService } from "./admin/services/LoggingService";
 
 // Load environment variables
 dotenv.config();
@@ -195,6 +197,33 @@ const socketService = new SocketService(io);
 const socketMonitoringService = SocketMonitoringService.getInstance();
 socketMonitoringService.attachToSocketServer(io);
 
+// Initialize System Monitoring Service
+const systemMonitoringService = SystemMonitoringService.getInstance();
+
+// Set up system monitoring event handlers
+systemMonitoringService.on('alert-triggered', (alert) => {
+  console.warn('System Alert:', alert.message);
+  // Could integrate with notification services here
+});
+
+interface Bottleneck {
+  type: string;
+  description: string;
+}
+
+systemMonitoringService.on('bottlenecks-detected', (bottlenecks: Bottleneck[]) => {
+  console.warn('Performance bottlenecks detected:', bottlenecks.length);
+  bottlenecks.forEach((bottleneck) => {
+    console.warn(`- ${bottleneck.type}: ${bottleneck.description}`);
+  });
+});
+
+// Start system monitoring in production or when explicitly enabled
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SYSTEM_MONITORING === 'true') {
+  systemMonitoringService.startMonitoring(5000); // 5 second intervals
+  console.log('System monitoring started');
+}
+
 // Set up session cleanup interval (every 5 minutes)
 setInterval(() => {
   socketService.cleanupInactiveSessions(30); // 30 minute timeout
@@ -235,6 +264,8 @@ setInterval(() => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   socketMonitoringService.shutdown();
+  systemMonitoringService.stopMonitoring();
+  loggingService.shutdown();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -244,6 +275,8 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
   socketMonitoringService.shutdown();
+  systemMonitoringService.stopMonitoring();
+  loggingService.shutdown();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

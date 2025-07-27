@@ -16,6 +16,25 @@ import adminRoutes from './routes';
 // Load environment variables
 dotenv.config();
 
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  adminLogger.error('Uncaught Exception', {
+    error: error.message,
+    stack: error.stack
+  });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  adminLogger.error('Unhandled Rejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
+  process.exit(1);
+});
+
 const app = express();
 const PORT = process.env.ADMIN_PORT || 4000;
 
@@ -33,7 +52,7 @@ app.use(helmet({
 
 // CORS configuration for React frontend
 app.use(cors({
-  origin: process.env.ADMIN_FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.ADMIN_FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -109,15 +128,51 @@ app.use((req, res) => {
 
 // Start server
 async function startAdminServer() {
+  console.log('Starting admin server...')
   try {
+    console.log('Connecting to admin database...')
     // Connect to admin database
     await connectAdminDatabase();
+    console.log('Admin database connected successfully');
+    
+    console.log('Initializing admin services...')
     
     // Initialize email service
-    AdminEmailService.initialize();
+    try {
+      AdminEmailService.initialize();
+      console.log('Email service initialized');
+    } catch (error) {
+      console.error('Failed to initialize email service:', error);
+      adminLogger.error('Failed to initialize email service', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
     
     // Initialize scheduler service
-    SchedulerService.initialize();
+    try {
+      SchedulerService.initialize();
+      console.log('Scheduler service initialized');
+    } catch (error) {
+      console.error('Failed to initialize scheduler service:', error);
+      adminLogger.error('Failed to initialize scheduler service', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+    
+    // Initialize scheduled reports service (optional, don't fail if it has issues)
+    try {
+      const { ScheduledReportsService } = await import('./services/ScheduledReportsService');
+      const scheduledReportsService = ScheduledReportsService.initialize();
+      adminLogger.info('Scheduled Reports Service initialized successfully');
+      console.log('Scheduled reports service initialized');
+    } catch (error) {
+      console.error('Failed to initialize scheduled reports service:', error);
+      adminLogger.warn('Failed to initialize Scheduled Reports Service, continuing without it', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+    
+    console.log('Admin services initialized successfully');
     
     const server = app.listen(PORT, () => {
       adminLogger.info(`Admin portal server running on port ${PORT}`, {

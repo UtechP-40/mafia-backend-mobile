@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { adminAsyncHandler } from '../middleware/errorHandler';
 import { requireAdminPermission, AuthenticatedAdminRequest, adminAuthMiddleware } from '../middleware/auth';
 import { adminLogger } from '../config/logger';
@@ -11,6 +11,14 @@ import reportsRoutes from './reports';
 import apiTestingRoutes from './apiTesting';
 import automatedTestingRoutes from './automatedTesting';
 import socketMonitoringRoutes from './socketMonitoring';
+import monitoringRoutes from './monitoring';
+import gameRoomsRoutes from './gameRooms';
+import securityRoutes from './security';
+import docsRoutes from './docs';
+import userManagementRoutes from './userManagement';
+import systemConfigurationRoutes from './systemConfiguration';
+import maintenanceRoutes from './maintenance';
+import securityMonitoringRoutes from './securityMonitoring';
 
 const router = Router();
 
@@ -37,6 +45,30 @@ router.use('/automated-testing', adminAuthMiddleware, automatedTestingRoutes);
 
 // Mount socket monitoring routes (authentication required)
 router.use('/socket-monitoring', adminAuthMiddleware, socketMonitoringRoutes);
+
+// Mount monitoring routes (authentication required)
+router.use('/monitoring', adminAuthMiddleware, monitoringRoutes);
+
+// Mount game rooms routes (authentication required)
+router.use('/game-rooms', adminAuthMiddleware, gameRoomsRoutes);
+
+// Mount security routes (authentication required)
+router.use('/security', adminAuthMiddleware, securityRoutes);
+
+// Mount API docs routes (authentication required)
+router.use('/docs', adminAuthMiddleware, docsRoutes);
+
+// Mount user management routes (authentication required)
+router.use('/user-management', adminAuthMiddleware, userManagementRoutes);
+
+// Mount system configuration routes (authentication required)
+router.use('/system-configuration', adminAuthMiddleware, systemConfigurationRoutes);
+
+// Mount maintenance routes (authentication required)
+router.use('/maintenance', adminAuthMiddleware, maintenanceRoutes);
+
+// Mount security monitoring routes (authentication required)
+router.use('/security-monitoring', adminAuthMiddleware, securityMonitoringRoutes);
 
 // Admin dashboard endpoint (requires authentication)
 router.get('/dashboard', adminAuthMiddleware, adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {

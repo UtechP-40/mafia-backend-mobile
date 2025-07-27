@@ -4,6 +4,9 @@ export * from './AdminLog';
 export * from './SystemMetric';
 export * from './AdminSession';
 export * from './EmailApproval';
+export * from './SystemConfiguration';
+export * from './MaintenanceSchedule';
+export * from './SecurityAlert';
 
 // Re-export commonly used types for convenience
 export type { ISuperUser, Permission } from './SuperUser';
@@ -22,3 +25,6 @@ export { AdminLog } from './AdminLog';
 export { SystemMetric } from './SystemMetric';
 export { AdminSession } from './AdminSession';
 export { EmailApproval } from './EmailApproval';
+export { SystemConfiguration } from './SystemConfiguration';
+export { MaintenanceSchedule } from './MaintenanceSchedule';
+export { SecurityAlert } from './SecurityAlert';

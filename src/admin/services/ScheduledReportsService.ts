@@ -672,4 +672,5 @@ export class ScheduledReportsService {
   }
 }
 
-export const scheduledReportsService = ScheduledReportsService.initialize();
+// Export the class for manual initialization
+export let scheduledReportsService: ScheduledReportsService;
