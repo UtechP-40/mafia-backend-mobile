@@ -17,6 +17,19 @@ export interface ISocketEvent extends Document {
   metadata?: any;
   createdAt: Date;
   updatedAt: Date;
+  
+  // Instance methods
+  isError(): boolean;
+  getSummary(): any;
+}
+
+export interface ISocketEventModel extends mongoose.Model<ISocketEvent> {
+  getEventStatistics(startDate: Date, endDate: Date, filters?: any): Promise<any[]>;
+  getTopActivePlayers(startDate: Date, endDate: Date, limit?: number): Promise<any[]>;
+  getRoomActivityStats(startDate: Date, endDate: Date): Promise<any[]>;
+  getErrorAnalysis(startDate: Date, endDate: Date): Promise<any[]>;
+  getRealtimeEvents(limit?: number, filters?: any): Promise<any[]>;
+  searchEvents(searchTerm: string, filters?: any, limit?: number): Promise<any[]>;
 }
 
 const SocketEventSchema = new Schema<ISocketEvent>({
@@ -145,7 +158,7 @@ SocketEventSchema.statics.getEventStatistics = async function(startDate: Date, e
       }
     },
     {
-      $sort: { count: -1 }
+      $sort: { count: -1 as -1 }
     }
   ];
 
@@ -177,7 +190,7 @@ SocketEventSchema.statics.getTopActivePlayers = async function(startDate: Date, 
       }
     },
     {
-      $sort: { eventCount: -1 }
+      $sort: { eventCount: -1 as -1 }
     },
     {
       $limit: limit
@@ -216,7 +229,7 @@ SocketEventSchema.statics.getRoomActivityStats = async function(startDate: Date,
       }
     },
     {
-      $sort: { eventCount: -1 }
+      $sort: { eventCount: -1 as -1 }
     }
   ];
 
@@ -252,7 +265,7 @@ SocketEventSchema.statics.getErrorAnalysis = async function(startDate: Date, end
       }
     },
     {
-      $sort: { count: -1 }
+      $sort: { count: -1 as -1 }
     }
   ];
 
@@ -289,4 +302,4 @@ SocketEventSchema.statics.searchEvents = async function(searchTerm: string, filt
     .lean();
 };
 
-export const SocketEvent = mongoose.model<ISocketEvent>('SocketEvent', SocketEventSchema);
+export const SocketEvent = mongoose.model<ISocketEvent, ISocketEventModel>('SocketEvent', SocketEventSchema);

@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { EventEmitter } from 'events';
 import { adminLogger } from '../config/logger';
 import { SocketMetrics } from '../models/SocketMetrics';
-import { SocketEvent } from '../models/SocketEvent';
+import { SocketEvent, ISocketEvent } from '../models/SocketEvent';
 import { GameRoomMetrics } from '../models/GameRoomMetrics';
 
 interface ConnectionInfo {
@@ -88,7 +88,7 @@ export class SocketMonitoringService extends EventEmitter {
   private static instance: SocketMonitoringService;
   private connections: Map<string, ConnectionInfo> = new Map();
   private rooms: Map<string, RoomInfo> = new Map();
-  private eventHistory: SocketEvent[] = [];
+  private eventHistory: ISocketEvent[] = [];
   private performanceMetrics: SocketPerformanceMetrics;
   private securityAlerts: SecurityAlert[] = [];
   private metricsInterval: NodeJS.Timeout | null = null;
@@ -492,14 +492,14 @@ export class SocketMonitoringService extends EventEmitter {
   }
 
   private recordEvent(eventData: any): void {
-    const event = new SocketEvent(eventData);
-    this.eventHistory.unshift(event);
+    // Store event data directly in memory for quick access
+    this.eventHistory.unshift(eventData as ISocketEvent);
     
     if (this.eventHistory.length > this.maxEventHistory) {
       this.eventHistory = this.eventHistory.slice(0, this.maxEventHistory);
     }
 
-    // Also buffer for batch processing
+    // Also buffer for batch processing to database
     this.eventBuffer.push(eventData);
   }
 
@@ -641,7 +641,7 @@ export class SocketMonitoringService extends EventEmitter {
     return { ...this.performanceMetrics };
   }
 
-  public getRecentEvents(limit: number = 100): SocketEvent[] {
+  public getRecentEvents(limit: number = 100): ISocketEvent[] {
     return this.eventHistory.slice(0, limit);
   }
 

@@ -50,6 +50,26 @@ export interface IGameRoomMetrics extends Document {
   };
   metadata?: any;
   updatedAt: Date;
+  
+  // Virtual properties
+  gameDurationMinutes: number;
+  activePlayerSessions: any[];
+  completionRate: number;
+  
+  // Instance methods
+  addPlayerSession(playerId: string): void;
+  endPlayerSession(playerId: string): void;
+  recordGameEvent(eventType: string, playerId?: string, data?: any): void;
+  updatePerformanceMetrics(): void;
+  startGame(): void;
+  endGame(): void;
+}
+
+export interface IGameRoomMetricsModel extends mongoose.Model<IGameRoomMetrics> {
+  getRoomStatsSummary(startDate: Date, endDate: Date): Promise<any>;
+  getTopPerformingRooms(limit?: number): Promise<any[]>;
+  getRoomCapacityAnalysis(days?: number): Promise<any[]>;
+  getHourlyActivity(days?: number): Promise<any[]>;
 }
 
 const GameRoomMetricsSchema = new Schema<IGameRoomMetrics>({
@@ -475,7 +495,7 @@ GameRoomMetricsSchema.statics.getRoomCapacityAnalysis = async function(days: num
       }
     },
     {
-      $sort: { _id: 1 }
+      $sort: { _id: 1 as 1 }
     }
   ];
 
@@ -501,11 +521,11 @@ GameRoomMetricsSchema.statics.getHourlyActivity = async function(days: number = 
       }
     },
     {
-      $sort: { _id: 1 }
+      $sort: { _id: 1 as 1 }
     }
   ];
 
   return await this.aggregate(pipeline);
 };
 
-export const GameRoomMetrics = mongoose.model<IGameRoomMetrics>('GameRoomMetrics', GameRoomMetricsSchema);
+export const GameRoomMetrics = mongoose.model<IGameRoomMetrics, IGameRoomMetricsModel>('GameRoomMetrics', GameRoomMetricsSchema);

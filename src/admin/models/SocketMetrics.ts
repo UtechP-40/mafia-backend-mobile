@@ -22,6 +22,15 @@ export interface ISocketMetrics extends Document {
   geographicDistribution: Record<string, number>;
   createdAt: Date;
   updatedAt: Date;
+  
+  // Instance methods
+  getConnectionEfficiency(): number;
+  getBandwidthPerConnection(): { incoming: number; outgoing: number };
+}
+
+export interface ISocketMetricsModel extends mongoose.Model<ISocketMetrics> {
+  getMetricsSummary(startDate: Date, endDate: Date): Promise<any>;
+  getPeakUsageTimes(days?: number): Promise<any[]>;
 }
 
 const SocketMetricsSchema = new Schema<ISocketMetrics>({
@@ -189,7 +198,7 @@ SocketMetricsSchema.statics.getPeakUsageTimes = async function(days: number = 7)
       }
     },
     {
-      $sort: { avgActiveConnections: -1 }
+      $sort: { avgActiveConnections: -1 as -1 }
     },
     {
       $limit: 24
@@ -199,4 +208,4 @@ SocketMetricsSchema.statics.getPeakUsageTimes = async function(days: number = 7)
   return await this.aggregate(pipeline);
 };
 
-export const SocketMetrics = mongoose.model<ISocketMetrics>('SocketMetrics', SocketMetricsSchema);
+export const SocketMetrics = mongoose.model<ISocketMetrics, ISocketMetricsModel>('SocketMetrics', SocketMetricsSchema);
