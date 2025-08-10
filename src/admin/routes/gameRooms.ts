@@ -424,6 +424,125 @@ router.post('/:roomId/kick/:playerId',
 );
 
 /**
+ * GET /admin/api/game-rooms/:id/actions
+ * Get player actions history for a specific room
+ */
+router.get('/:id/actions',
+  requireAdminPermission(Permission.SYSTEM_MONITOR),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    const { id } = req.params;
+    const { limit = 100, offset = 0 } = req.query;
+    
+    adminLogger.info('Room actions history accessed', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      roomId: id
+    });
+
+    try {
+      // Mock player actions data - in real implementation, this would come from game logs
+      const mockActions = Array.from({ length: 50 }, (_, index) => ({
+        id: `action-${index}`,
+        playerId: `player-${Math.floor(Math.random() * 5) + 1}`,
+        playerName: `Player${Math.floor(Math.random() * 5) + 1}`,
+        action: ['vote', 'message', 'join', 'leave', 'eliminate'][Math.floor(Math.random() * 5)],
+        target: Math.random() > 0.5 ? `Player${Math.floor(Math.random() * 5) + 1}` : undefined,
+        timestamp: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+        gamePhase: ['day', 'night', 'voting', 'results'][Math.floor(Math.random() * 4)],
+        data: {
+          reason: Math.random() > 0.7 ? 'Suspicious behavior' : undefined,
+          confidence: Math.random()
+        }
+      })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      const paginatedActions = mockActions.slice(
+        parseInt(offset as string), 
+        parseInt(offset as string) + parseInt(limit as string)
+      );
+
+      res.json({
+        success: true,
+        data: paginatedActions,
+        pagination: {
+          total: mockActions.length,
+          limit: parseInt(limit as string),
+          offset: parseInt(offset as string)
+        }
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch room actions', {
+        userId: adminUser.id,
+        roomId: id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch room actions',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * GET /admin/api/game-rooms/:id/performance
+ * Get performance metrics for a specific room
+ */
+router.get('/:id/performance',
+  requireAdminPermission(Permission.SYSTEM_MONITOR),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    const { id } = req.params;
+    
+    adminLogger.info('Room performance metrics accessed', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      roomId: id
+    });
+
+    try {
+      // Mock performance metrics - in real implementation, this would come from monitoring systems
+      const performanceMetrics = {
+        roomId: id,
+        averageResponseTime: Math.random() * 200 + 50, // 50-250ms
+        messageLatency: Math.random() * 100 + 20, // 20-120ms
+        connectionStability: Math.random() * 0.2 + 0.8, // 80-100%
+        memoryUsage: Math.random() * 0.3 + 0.4, // 40-70%
+        cpuUsage: Math.random() * 0.4 + 0.2, // 20-60%
+        networkThroughput: Math.random() * 5 + 2, // 2-7 MB/s
+        errorRate: Math.random() * 0.05, // 0-5%
+        playerSatisfaction: Math.random() * 0.3 + 0.7, // 70-100%
+        recommendations: [
+          'Connection stability is excellent',
+          'Consider optimizing message broadcasting for better latency',
+          'Memory usage is within acceptable limits',
+          'Monitor CPU usage during peak player activity'
+        ].filter(() => Math.random() > 0.3) // Randomly include recommendations
+      };
+
+      res.json({
+        success: true,
+        data: performanceMetrics
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch room performance metrics', {
+        userId: adminUser.id,
+        roomId: id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch room performance metrics',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
  * POST /admin/api/game-rooms/performance-test
  * Run performance test with simulated players
  */

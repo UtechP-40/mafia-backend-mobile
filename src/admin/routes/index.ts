@@ -32,7 +32,7 @@ router.use('/approvals', adminAuthMiddleware, approvalRoutes);
 router.use('/database', adminAuthMiddleware, databaseRoutes);
 
 // Mount analytics routes (authentication required)
-router.use('/analytics', analyticsRoutes);
+router.use('/analytics', adminAuthMiddleware, analyticsRoutes);
 
 // Mount reports routes (authentication required)
 router.use('/reports', reportsRoutes);
@@ -51,6 +51,12 @@ router.use('/monitoring', adminAuthMiddleware, monitoringRoutes);
 
 // Mount game rooms routes (authentication required)
 router.use('/game-rooms', adminAuthMiddleware, gameRoomsRoutes);
+
+// Import moderation routes
+import moderationRoutes from './moderation';
+
+// Mount moderation routes (authentication required)
+router.use('/moderation', adminAuthMiddleware, moderationRoutes);
 
 // Mount security routes (authentication required)
 router.use('/security', adminAuthMiddleware, securityRoutes);

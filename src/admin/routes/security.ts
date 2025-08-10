@@ -6,111 +6,59 @@ import { Permission } from '../models/SuperUser';
 
 const router = Router();
 
-// Mock security alerts data
-const mockSecurityAlerts = [
-  {
-    id: '1',
-    roomId: 'room-123',
-    playerId: 'player-456',
-    type: 'suspicious_activity',
-    severity: 'medium',
-    description: 'Player performing unusual voting patterns',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    resolved: false,
-  },
-  {
-    id: '2',
-    roomId: 'room-789',
-    playerId: 'player-101',
-    type: 'inappropriate_content',
-    severity: 'high',
-    description: 'Inappropriate language detected in chat messages',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-    resolved: false,
-  },
-  {
-    id: '3',
-    roomId: 'room-456',
-    playerId: 'player-789',
-    type: 'connection_abuse',
-    severity: 'low',
-    description: 'Multiple rapid reconnection attempts detected',
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
-    resolved: true,
-  },
-  {
-    id: '4',
-    roomId: 'room-321',
-    playerId: 'player-654',
-    type: 'cheating_detected',
-    severity: 'critical',
-    description: 'Potential game state manipulation detected',
-    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-    resolved: false,
-  },
-];
-
 /**
- * GET /admin/api/security/alerts
- * Get security alerts with filtering
+ * GET /admin/api/security/cheat-detection
+ * Get cheat detection alerts
  */
-router.get('/alerts',
-  requireAdminPermission(Permission.SECURITY_MONITOR),
+router.get('/cheat-detection',
+  requireAdminPermission(Permission.SECURITY_VIEW),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
-    const { severity, type, resolved, limit = 50 } = req.query;
     
-    adminLogger.info('Security alerts accessed', {
+    adminLogger.info('Cheat detection alerts accessed', {
       userId: adminUser.id,
-      username: adminUser.username,
-      filters: { severity, type, resolved }
+      username: adminUser.username
     });
 
     try {
-      let filteredAlerts = [...mockSecurityAlerts];
-      
-      if (severity) {
-        filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity);
-      }
-      
-      if (type) {
-        filteredAlerts = filteredAlerts.filter(alert => alert.type === type);
-      }
-      
-      if (resolved !== undefined) {
-        const isResolved = resolved === 'true';
-        filteredAlerts = filteredAlerts.filter(alert => alert.resolved === isResolved);
-      }
-      
-      // Sort by timestamp (newest first)
-      filteredAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      
-      // Apply limit
-      filteredAlerts = filteredAlerts.slice(0, parseInt(limit as string));
+      // Mock cheat detection alerts - in real implementation, this would come from ML/AI systems
+      const mockAlerts = Array.from({ length: 15 }, (_, index) => ({
+        id: `alert-${index + 1}`,
+        playerId: `player-${Math.floor(Math.random() * 100) + 1}`,
+        playerName: `Player${Math.floor(Math.random() * 100) + 1}`,
+        roomId: `room-${Math.floor(Math.random() * 20) + 1}`,
+        roomCode: `ROOM${Math.floor(Math.random() * 9000) + 1000}`,
+        type: ['speed_hacking', 'pattern_anomaly', 'impossible_action', 'coordination_suspicious'][Math.floor(Math.random() * 4)],
+        severity: ['low', 'medium', 'high', 'critical'][Math.floor(Math.random() * 4)],
+        confidence: Math.random() * 0.4 + 0.6, // 60-100% confidence
+        description: [
+          'Player actions detected at inhuman speed',
+          'Unusual voting patterns detected',
+          'Impossible game knowledge demonstrated',
+          'Suspicious coordination with other players'
+        ][Math.floor(Math.random() * 4)],
+        evidence: [
+          { type: 'timing', data: { averageResponseTime: Math.random() * 100 + 50 } },
+          { type: 'pattern', data: { consistency: Math.random() } }
+        ],
+        timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+        status: ['pending', 'investigating', 'confirmed', 'false_positive'][Math.floor(Math.random() * 4)],
+        assignedTo: Math.random() > 0.5 ? `moderator-${Math.floor(Math.random() * 5) + 1}` : undefined
+      }));
 
       res.json({
         success: true,
-        data: filteredAlerts,
-        summary: {
-          total: filteredAlerts.length,
-          unresolved: filteredAlerts.filter(a => !a.resolved).length,
-          bySeverity: {
-            critical: filteredAlerts.filter(a => a.severity === 'critical').length,
-            high: filteredAlerts.filter(a => a.severity === 'high').length,
-            medium: filteredAlerts.filter(a => a.severity === 'medium').length,
-            low: filteredAlerts.filter(a => a.severity === 'low').length,
-          }
-        }
+        data: mockAlerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       });
     } catch (error) {
-      adminLogger.error('Failed to fetch security alerts', {
+      adminLogger.error('Failed to fetch cheat detection alerts', {
         userId: adminUser.id,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch security alerts',
+        message: 'Failed to fetch cheat detection alerts',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -118,54 +66,37 @@ router.get('/alerts',
 );
 
 /**
- * POST /admin/api/security/alerts/:id/resolve
- * Resolve a security alert
+ * PUT /admin/api/security/cheat-detection/:id
+ * Update cheat detection alert status
  */
-router.post('/alerts/:id/resolve',
+router.put('/cheat-detection/:id',
   requireAdminPermission(Permission.SECURITY_ADMIN),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
     const { id } = req.params;
-    const { resolution, notes } = req.body;
+    const { status } = req.body;
     
-    adminLogger.info('Security alert resolution', {
+    adminLogger.info('Cheat detection alert updated', {
       userId: adminUser.id,
       username: adminUser.username,
       alertId: id,
-      resolution,
-      notes
+      newStatus: status
     });
 
     try {
-      const alertIndex = mockSecurityAlerts.findIndex(alert => alert.id === id);
-      
-      if (alertIndex === -1) {
-        return res.status(404).json({
-          success: false,
-          message: 'Security alert not found'
-        });
-      }
-
-      // Mark alert as resolved
-      mockSecurityAlerts[alertIndex].resolved = true;
-      mockSecurityAlerts[alertIndex].resolvedBy = adminUser.username;
-      mockSecurityAlerts[alertIndex].resolvedAt = new Date().toISOString();
-      mockSecurityAlerts[alertIndex].resolution = resolution;
-      mockSecurityAlerts[alertIndex].notes = notes;
-
+      // In real implementation, update the alert in database
       res.json({
         success: true,
-        message: 'Security alert resolved successfully',
+        message: 'Alert status updated successfully',
         data: {
           alertId: id,
-          resolvedBy: adminUser.username,
-          resolvedAt: new Date(),
-          resolution,
-          notes
+          status,
+          updatedBy: adminUser.username,
+          timestamp: new Date()
         }
       });
     } catch (error) {
-      adminLogger.error('Failed to resolve security alert', {
+      adminLogger.error('Failed to update cheat detection alert', {
         userId: adminUser.id,
         alertId: id,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -173,7 +104,7 @@ router.post('/alerts/:id/resolve',
       
       res.status(500).json({
         success: false,
-        message: 'Failed to resolve security alert',
+        message: 'Failed to update alert status',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -181,95 +112,121 @@ router.post('/alerts/:id/resolve',
 );
 
 /**
- * GET /admin/api/security/analytics
- * Get security analytics and trends
+ * GET /admin/api/security/risk-profiles
+ * Get player risk profiles
  */
-router.get('/analytics',
-  requireAdminPermission(Permission.ANALYTICS_READ),
+router.get('/risk-profiles',
+  requireAdminPermission(Permission.SECURITY_VIEW),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
     const adminUser = req.adminUser;
-    const { days = 7 } = req.query;
     
-    adminLogger.info('Security analytics accessed', {
+    adminLogger.info('Player risk profiles accessed', {
       userId: adminUser.id,
-      username: adminUser.username,
-      days
+      username: adminUser.username
     });
 
     try {
-      const daysCount = parseInt(days as string);
-      const now = new Date();
-      const startDate = new Date(now.getTime() - daysCount * 24 * 60 * 60 * 1000);
-      
-      // Filter alerts within the date range
-      const recentAlerts = mockSecurityAlerts.filter(alert => 
-        new Date(alert.timestamp) >= startDate
-      );
-
-      const analytics = {
-        totalAlerts: recentAlerts.length,
-        resolvedAlerts: recentAlerts.filter(a => a.resolved).length,
-        unresolvedAlerts: recentAlerts.filter(a => !a.resolved).length,
-        alertsByType: recentAlerts.reduce((acc, alert) => {
-          acc[alert.type] = (acc[alert.type] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-        alertsBySeverity: recentAlerts.reduce((acc, alert) => {
-          acc[alert.severity] = (acc[alert.severity] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-        dailyTrend: Array.from({ length: daysCount }, (_, i) => {
-          const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
-          const dayAlerts = recentAlerts.filter(alert => {
-            const alertDate = new Date(alert.timestamp);
-            return alertDate.toDateString() === date.toDateString();
-          });
-          
-          return {
-            date: date.toISOString().split('T')[0],
-            count: dayAlerts.length,
-            resolved: dayAlerts.filter(a => a.resolved).length
-          };
-        }),
-        topRiskyRooms: Object.entries(
-          recentAlerts.reduce((acc, alert) => {
-            acc[alert.roomId] = (acc[alert.roomId] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        )
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([roomId, count]) => ({ roomId, alertCount: count })),
-        
-        topRiskyPlayers: Object.entries(
-          recentAlerts.reduce((acc, alert) => {
-            acc[alert.playerId] = (acc[alert.playerId] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        )
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([playerId, count]) => ({ playerId, alertCount: count }))
-      };
+      // Mock risk profiles - in real implementation, this would come from ML analysis
+      const mockProfiles = Array.from({ length: 20 }, (_, index) => {
+        const riskScore = Math.floor(Math.random() * 100);
+        return {
+          playerId: `player-${index + 1}`,
+          playerName: `Player${index + 1}`,
+          riskScore,
+          riskLevel: riskScore > 75 ? 'critical' : riskScore > 50 ? 'high' : riskScore > 25 ? 'medium' : 'low',
+          behaviorMetrics: {
+            averageResponseTime: Math.random() * 2000 + 500,
+            actionPatternConsistency: Math.random(),
+            socialInteractionScore: Math.random(),
+            gameKnowledgeLevel: Math.random(),
+            suspiciousActivityCount: Math.floor(Math.random() * 10)
+          },
+          recentFlags: Math.floor(Math.random() * 5),
+          accountAge: Math.floor(Math.random() * 365) + 1,
+          gamesPlayed: Math.floor(Math.random() * 1000) + 10,
+          winRate: Math.random() * 0.4 + 0.3, // 30-70% win rate
+          reportCount: Math.floor(Math.random() * 3),
+          lastUpdated: new Date().toISOString()
+        };
+      });
 
       res.json({
         success: true,
-        data: analytics,
-        dateRange: {
-          start: startDate.toISOString(),
-          end: now.toISOString(),
-          days: daysCount
-        }
+        data: mockProfiles.sort((a, b) => b.riskScore - a.riskScore)
       });
     } catch (error) {
-      adminLogger.error('Failed to fetch security analytics', {
+      adminLogger.error('Failed to fetch player risk profiles', {
         userId: adminUser.id,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch security analytics',
+        message: 'Failed to fetch player risk profiles',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * GET /admin/api/security/player-profile/:id
+ * Get detailed player profile
+ */
+router.get('/player-profile/:id',
+  requireAdminPermission(Permission.SECURITY_VIEW),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    const { id } = req.params;
+    
+    adminLogger.info('Player profile accessed', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      playerId: id
+    });
+
+    try {
+      // Mock detailed player profile
+      const riskScore = Math.floor(Math.random() * 100);
+      const mockProfile = {
+        playerId: id,
+        playerName: `Player${id}`,
+        riskScore,
+        riskLevel: riskScore > 75 ? 'critical' : riskScore > 50 ? 'high' : riskScore > 25 ? 'medium' : 'low',
+        behaviorMetrics: {
+          averageResponseTime: Math.random() * 2000 + 500,
+          actionPatternConsistency: Math.random(),
+          socialInteractionScore: Math.random(),
+          gameKnowledgeLevel: Math.random(),
+          suspiciousActivityCount: Math.floor(Math.random() * 10)
+        },
+        recentFlags: Math.floor(Math.random() * 5),
+        accountAge: Math.floor(Math.random() * 365) + 1,
+        gamesPlayed: Math.floor(Math.random() * 1000) + 10,
+        winRate: Math.random() * 0.4 + 0.3,
+        reportCount: Math.floor(Math.random() * 3),
+        recentActivity: Array.from({ length: 10 }, (_, i) => ({
+          timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+          action: ['game_joined', 'vote_cast', 'message_sent', 'game_left'][Math.floor(Math.random() * 4)],
+          details: 'Activity details here'
+        })),
+        lastUpdated: new Date().toISOString()
+      };
+
+      res.json({
+        success: true,
+        data: mockProfile
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch player profile', {
+        userId: adminUser.id,
+        playerId: id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch player profile',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

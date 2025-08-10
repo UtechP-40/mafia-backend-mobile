@@ -1,514 +1,92 @@
 import { Router, Response } from 'express';
 import { adminAsyncHandler } from '../middleware/errorHandler';
-import { requireAdminPermission, AuthenticatedAdminRequest, adminAuthMiddleware } from '../middleware/auth';
-import { adminLogger, adminPerformanceLogger } from '../config/logger';
+import { requireAdminPermission, AuthenticatedAdminRequest } from '../middleware/auth';
+import { adminLogger } from '../config/logger';
 import { Permission } from '../models/SuperUser';
-import { adminAnalyticsService } from '../services/AnalyticsService';
-import { EventType, MetricType } from '../../models';
-import { Types } from 'mongoose';
 
 const router = Router();
 
-// All analytics routes require authentication
-router.use(adminAuthMiddleware);
-
 /**
- * Get real-time dashboard metrics
- * GET /admin/api/analytics/dashboard
+ * GET /admin/api/analytics/game-balance
+ * Get game balance analysis metrics
  */
-router.get('/dashboard', 
+router.get('/game-balance',
   requireAdminPermission(Permission.ANALYTICS_READ),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { startDate, endDate, granularity, timezone } = req.query;
+    const adminUser = req.adminUser;
+    const { period = '7d' } = req.query;
     
-    // Default to last 7 days if no dates provided
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    // Validate date range (max 90 days)
-    const maxRange = 90 * 24 * 60 * 60 * 1000;
-    if (end.getTime() - start.getTime() > maxRange) {
-      return res.status(400).json({
-        success: false,
-        message: 'Date range cannot exceed 90 days'
-      });
-    }
-
-    const metrics = await adminAnalyticsService.getDashboardMetrics({
-      startDate: start,
-      endDate: end,
-      granularity: (granularity as 'hour' | 'day' | 'week' | 'month') || 'day',
-      timezone: timezone as string
+    adminLogger.info('Game balance analytics accessed', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      period
     });
 
-    adminLogger.info('Dashboard metrics accessed', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      dateRange: { startDate: start, endDate: end },
-      granularity
-    });
-
-    res.json({
-      success: true,
-      data: metrics
-    });
-  })
-);
-
-/**
- * Execute custom analytics query
- * POST /admin/api/analytics/query
- */
-router.post('/query',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { collection, filters, aggregation, groupBy, sortBy, limit, skip } = req.body;
-
-    // Validate required fields
-    if (!collection || !filters) {
-      return res.status(400).json({
-        success: false,
-        message: 'Collection and filters are required'
-      });
-    }
-
-    // Validate collection
-    const allowedCollections = ['analytics_events', 'performance_metrics', 'error_logs'];
-    if (!allowedCollections.includes(collection)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid collection. Allowed: ${allowedCollections.join(', ')}`
-      });
-    }
-
-    const queryBuilder = {
-      collection,
-      filters,
-      aggregation,
-      groupBy,
-      sortBy,
-      limit: Math.min(limit || 1000, 10000), // Cap at 10k records
-      skip
-    };
-
-    const result = await adminAnalyticsService.executeCustomQuery(queryBuilder);
-
-    adminLogger.info('Custom analytics query executed', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      collection,
-      resultCount: Array.isArray(result) ? result.length : 1
-    });
-
-    res.json({
-      success: true,
-      data: result,
-      query: queryBuilder
-    });
-  })
-);
-
-/**
- * Get time-based data aggregation with period comparison
- * GET /admin/api/analytics/time-series
- */
-router.get('/time-series',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { 
-      collection, 
-      metric, 
-      startDate, 
-      endDate, 
-      granularity = 'day',
-      compareWithPrevious = 'false'
-    } = req.query;
-
-    // Validate required fields
-    if (!collection || !metric) {
-      return res.status(400).json({
-        success: false,
-        message: 'Collection and metric are required'
-      });
-    }
-
-    // Default to last 30 days if no dates provided
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const result = await adminAnalyticsService.getTimeBasedAggregation(
-      collection as string,
-      metric as string,
-      start,
-      end,
-      granularity as 'hour' | 'day' | 'week' | 'month',
-      compareWithPrevious === 'true'
-    );
-
-    adminLogger.info('Time-series data retrieved', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      collection,
-      metric,
-      granularity,
-      compareWithPrevious
-    });
-
-    res.json({
-      success: true,
-      data: result
-    });
-  })
-);
-
-/**
- * Export analytics data
- * POST /admin/api/analytics/export
- */
-router.post('/export',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { collection, filters, format = 'json', filename, includeMetadata = true } = req.body;
-
-    // Validate required fields
-    if (!collection || !filters) {
-      return res.status(400).json({
-        success: false,
-        message: 'Collection and filters are required'
-      });
-    }
-
-    // Validate format
-    const allowedFormats = ['json', 'csv', 'xlsx'];
-    if (!allowedFormats.includes(format)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid format. Allowed: ${allowedFormats.join(', ')}`
-      });
-    }
-
-    const exportOptions = {
-      format,
-      filename,
-      includeMetadata,
-      compression: false
-    };
-
-    const result = await adminAnalyticsService.exportAnalyticsData(
-      collection,
-      filters,
-      exportOptions
-    );
-
-    adminLogger.info('Analytics data exported', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      collection,
-      format,
-      recordCount: result.metadata.recordCount
-    });
-
-    res.json({
-      success: true,
-      data: {
-        downloadUrl: `/admin/api/analytics/download/${encodeURIComponent(result.filePath.split('/').pop() || '')}`,
-        metadata: result.metadata
-      }
-    });
-  })
-);
-
-/**
- * Download exported file
- * GET /admin/api/analytics/download/:filename
- */
-router.get('/download/:filename',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { filename } = req.params;
-    const { compress = 'false' } = req.query;
-
-    // Validate filename to prevent directory traversal
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid filename'
-      });
-    }
-
-    const filePath = await adminAnalyticsService.downloadLogFile(filename, compress === 'true');
-
-    adminLogger.info('File download requested', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      filename,
-      compress
-    });
-
-    res.download(filePath, filename);
-  })
-);
-
-/**
- * Get comprehensive logs with filtering
- * GET /admin/api/analytics/logs
- */
-router.get('/logs',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { 
-      level, 
-      category, 
-      startTime, 
-      endTime, 
-      maxLines = '1000',
-      search
-    } = req.query;
-
-    const options = {
-      level: level as string,
-      category: category as string,
-      startTime: startTime ? new Date(startTime as string) : undefined,
-      endTime: endTime ? new Date(endTime as string) : undefined,
-      maxLines: Math.min(parseInt(maxLines as string), 10000) // Cap at 10k lines
-    };
-
-    let logs = await adminAnalyticsService.getLogs(options);
-
-    // Apply search filter if provided
-    if (search) {
-      const searchTerm = (search as string).toLowerCase();
-      logs = logs.filter(log => 
-        log.message?.toLowerCase().includes(searchTerm) ||
-        log.level?.toLowerCase().includes(searchTerm) ||
-        JSON.stringify(log).toLowerCase().includes(searchTerm)
-      );
-    }
-
-    adminLogger.info('Logs retrieved', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      level,
-      category,
-      logCount: logs.length,
-      search: search ? 'applied' : 'none'
-    });
-
-    res.json({
-      success: true,
-      data: logs,
-      filters: options,
-      totalCount: logs.length
-    });
-  })
-);
-
-/**
- * Stream live logs via WebSocket (placeholder for WebSocket implementation)
- * GET /admin/api/analytics/logs/stream
- */
-router.get('/logs/stream',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    // This would typically be implemented with WebSocket
-    // For now, return information about WebSocket endpoint
-    res.json({
-      success: true,
-      message: 'Live log streaming available via WebSocket',
-      websocketUrl: `/admin/ws/logs`,
-      supportedFilters: ['level', 'category', 'follow']
-    });
-  })
-);
-
-/**
- * Get log file list
- * GET /admin/api/analytics/logs/files
- */
-router.get('/logs/files',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const fs = require('fs/promises');
-    const path = require('path');
-    
     try {
-      const logsDir = path.join(process.cwd(), 'logs', 'admin');
-      const files = await fs.readdir(logsDir);
-      
-      const logFiles = [];
-      for (const file of files) {
-        if (file.endsWith('.log')) {
-          const filePath = path.join(logsDir, file);
-          const stats = await fs.stat(filePath);
-          
-          logFiles.push({
-            name: file,
-            size: stats.size,
-            modified: stats.mtime,
-            category: file.includes('error') ? 'error' : 
-                     file.includes('security') ? 'security' : 
-                     file.includes('performance') ? 'performance' : 'general'
-          });
-        }
-      }
-
-      adminLogger.info('Log files listed', {
-        userId: req.adminUser.id,
-        username: req.adminUser.username,
-        fileCount: logFiles.length
-      });
+      // Mock game balance metrics - in real implementation, this would come from game data analysis
+      const mockBalanceMetrics = {
+        roleWinRates: {
+          'Mafia': {
+            winRate: 0.42,
+            gamesPlayed: 156,
+            trend: 'down'
+          },
+          'Detective': {
+            winRate: 0.38,
+            gamesPlayed: 134,
+            trend: 'stable'
+          },
+          'Doctor': {
+            winRate: 0.35,
+            gamesPlayed: 128,
+            trend: 'up'
+          },
+          'Villager': {
+            winRate: 0.52,
+            gamesPlayed: 298,
+            trend: 'stable'
+          },
+          'Mayor': {
+            winRate: 0.48,
+            gamesPlayed: 89,
+            trend: 'up'
+          }
+        },
+        averageGameDuration: 1680, // seconds
+        playerEliminationRates: {
+          day: 0.35,
+          night: 0.28
+        },
+        votingPatterns: {
+          averageVotesPerPlayer: 3.2,
+          unanimousVotes: 0.15,
+          splitVotes: 0.42
+        },
+        balanceScore: 78,
+        recommendations: [
+          'Mafia win rate is slightly low - consider adjusting night action success rates',
+          'Detective role could use a minor buff to increase effectiveness',
+          'Villager win rate is within acceptable range but trending high',
+          'Consider implementing role-specific balance adjustments based on player count',
+          'Monitor voting patterns for potential meta-gaming issues'
+        ]
+      };
 
       res.json({
         success: true,
-        data: logFiles
+        data: mockBalanceMetrics,
+        period,
+        generatedAt: new Date().toISOString()
       });
     } catch (error) {
-      adminLogger.error('Failed to list log files', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.adminUser.id
+      adminLogger.error('Failed to fetch game balance analytics', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
-
+      
       res.status(500).json({
         success: false,
-        message: 'Failed to list log files'
-      });
-    }
-  })
-);
-
-/**
- * Apply retention policies
- * POST /admin/api/analytics/retention
- */
-router.post('/retention',
-  requireAdminPermission(Permission.SYSTEM_ADMIN),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { policies } = req.body;
-
-    if (!Array.isArray(policies) || policies.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Policies array is required'
-      });
-    }
-
-    // Validate policies
-    for (const policy of policies) {
-      if (!policy.collection || !policy.retentionDays) {
-        return res.status(400).json({
-          success: false,
-          message: 'Each policy must have collection and retentionDays'
-        });
-      }
-    }
-
-    await adminAnalyticsService.applyRetentionPolicies(policies);
-
-    adminLogger.info('Retention policies applied', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      policiesCount: policies.length
-    });
-
-    res.json({
-      success: true,
-      message: 'Retention policies applied successfully',
-      appliedPolicies: policies.length
-    });
-  })
-);
-
-/**
- * Clear analytics cache
- * DELETE /admin/api/analytics/cache
- */
-router.delete('/cache',
-  requireAdminPermission(Permission.SYSTEM_ADMIN),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { tag } = req.query;
-
-    adminAnalyticsService.clearCache(tag as string);
-
-    adminLogger.info('Analytics cache cleared', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      tag: tag || 'all'
-    });
-
-    res.json({
-      success: true,
-      message: `Cache cleared${tag ? ` for tag: ${tag}` : ' (all)'}`
-    });
-  })
-);
-
-/**
- * Get analytics health status
- * GET /admin/api/analytics/health
- */
-router.get('/health',
-  requireAdminPermission(Permission.ANALYTICS_READ),
-  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const startTime = Date.now();
-    
-    try {
-      // Test database connectivity and basic queries
-      const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      
-      const healthChecks = await Promise.all([
-        // Test analytics events query
-        adminAnalyticsService.executeCustomQuery({
-          collection: 'analytics_events',
-          filters: { timestamp: { $gte: oneHourAgo, $lte: now } },
-          limit: 1
-        }),
-        // Test performance metrics query
-        adminAnalyticsService.executeCustomQuery({
-          collection: 'performance_metrics',
-          filters: { timestamp: { $gte: oneHourAgo, $lte: now } },
-          limit: 1
-        }),
-        // Test error logs query
-        adminAnalyticsService.executeCustomQuery({
-          collection: 'error_logs',
-          filters: { timestamp: { $gte: oneHourAgo, $lte: now } },
-          limit: 1
-        })
-      ]);
-
-      const responseTime = Date.now() - startTime;
-
-      res.json({
-        success: true,
-        status: 'healthy',
-        timestamp: now,
-        responseTime,
-        checks: {
-          database: 'connected',
-          analyticsEvents: 'accessible',
-          performanceMetrics: 'accessible',
-          errorLogs: 'accessible'
-        },
-        system: {
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-          nodeVersion: process.version
-        }
-      });
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      
-      adminLogger.error('Analytics health check failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        responseTime
-      });
-
-      res.status(503).json({
-        success: false,
-        status: 'unhealthy',
-        timestamp: new Date(),
-        responseTime,
+        message: 'Failed to fetch game balance analytics',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -516,61 +94,326 @@ router.get('/health',
 );
 
 /**
- * Get system performance metrics
- * GET /admin/api/analytics/performance
+ * GET /admin/api/analytics/player-engagement
+ * Get player engagement and retention metrics
  */
-router.get('/performance',
-  requireAdminPermission(Permission.SYSTEM_MONITOR),
+router.get('/player-engagement',
+  requireAdminPermission(Permission.ANALYTICS_READ),
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
-    const { startDate, endDate, metric } = req.query;
+    const adminUser = req.adminUser;
+    const { period = '7d' } = req.query;
+    
+    adminLogger.info('Player engagement analytics accessed', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      period
+    });
 
-    // Default to last 24 hours if no dates provided
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const start = startDate ? new Date(startDate as string) : new Date(end.getTime() - 24 * 60 * 60 * 1000);
-
-    const filters: any = {
-      timestamp: { $gte: start, $lte: end }
-    };
-
-    if (metric) {
-      filters.metricName = metric;
-    }
-
-    const performanceData = await adminAnalyticsService.executeCustomQuery({
-      collection: 'performance_metrics',
-      filters,
-      aggregation: [
-        {
-          $group: {
-            _id: '$metricName',
-            avg: { $avg: '$value' },
-            min: { $min: '$value' },
-            max: { $max: '$value' },
-            count: { $sum: 1 },
-            latest: { $last: '$value' }
-          }
+    try {
+      // Mock engagement metrics
+      const mockEngagementMetrics = {
+        dailyActiveUsers: 1247,
+        weeklyActiveUsers: 4892,
+        monthlyActiveUsers: 12456,
+        averageSessionDuration: 2340, // seconds
+        retentionRates: {
+          day1: 0.72,
+          day7: 0.45,
+          day30: 0.28
         },
-        { $sort: { count: -1 } }
-      ]
+        churnRate: 0.15,
+        engagementScore: 84,
+        topEngagementFactors: [
+          'Social interaction during games',
+          'Role variety and complexity',
+          'Quick matchmaking times',
+          'Achievement and progression systems',
+          'Community events and tournaments'
+        ]
+      };
+
+      res.json({
+        success: true,
+        data: mockEngagementMetrics,
+        period,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch player engagement analytics', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch player engagement analytics',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * GET /admin/api/analytics/health-reports
+ * Get game health reports
+ */
+router.get('/health-reports',
+  requireAdminPermission(Permission.ANALYTICS_READ),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    
+    adminLogger.info('Health reports accessed', {
+      userId: adminUser.id,
+      username: adminUser.username
     });
 
-    adminLogger.info('Performance metrics retrieved', {
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      dateRange: { startDate: start, endDate: end },
-      metric: metric || 'all'
+    try {
+      // Mock health reports
+      const mockHealthReports = Array.from({ length: 10 }, (_, index) => {
+        const healthScore = Math.floor(Math.random() * 40) + 60; // 60-100
+        return {
+          id: `report-${index + 1}`,
+          generatedAt: new Date(Date.now() - index * 86400000).toISOString(),
+          period: index === 0 ? 'Today' : `${index} day${index > 1 ? 's' : ''} ago`,
+          overallHealth: healthScore > 85 ? 'excellent' : healthScore > 70 ? 'good' : healthScore > 55 ? 'fair' : 'poor',
+          healthScore,
+          metrics: {
+            playerSatisfaction: Math.floor(Math.random() * 30) + 70,
+            gameBalance: Math.floor(Math.random() * 30) + 70,
+            technicalPerformance: Math.floor(Math.random() * 30) + 70,
+            communityHealth: Math.floor(Math.random() * 30) + 70
+          },
+          alerts: Array.from({ length: Math.floor(Math.random() * 5) }, (_, alertIndex) => ({
+            id: `alert-${index}-${alertIndex}`,
+            type: ['critical', 'warning', 'info'][Math.floor(Math.random() * 3)],
+            category: ['balance', 'engagement', 'performance', 'community'][Math.floor(Math.random() * 4)],
+            message: [
+              'Mafia win rate has dropped below optimal threshold',
+              'Player retention showing declining trend',
+              'Server response times increasing during peak hours',
+              'Increase in player reports and moderation cases',
+              'New player onboarding completion rate declining'
+            ][Math.floor(Math.random() * 5)],
+            impact: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)],
+            timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString(),
+            resolved: Math.random() > 0.3
+          })),
+          recommendations: [
+            'Monitor role balance adjustments in upcoming patch',
+            'Implement targeted retention campaigns for at-risk players',
+            'Optimize server infrastructure for peak load handling',
+            'Enhance community moderation tools and processes',
+            'Improve new player tutorial and onboarding experience'
+          ].slice(0, Math.floor(Math.random() * 3) + 2),
+          trends: {
+            playerGrowth: (Math.random() - 0.5) * 0.2, // -10% to +10%
+            engagementTrend: (Math.random() - 0.5) * 0.15,
+            retentionTrend: (Math.random() - 0.5) * 0.1
+          }
+        };
+      });
+
+      res.json({
+        success: true,
+        data: mockHealthReports
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch health reports', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch health reports',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * POST /admin/api/analytics/generate-report
+ * Generate a new analytics report
+ */
+router.post('/generate-report',
+  requireAdminPermission(Permission.ANALYTICS_ADMIN),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    const { type, period } = req.body;
+    
+    adminLogger.info('Report generation requested', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      reportType: type,
+      period
     });
 
-    res.json({
-      success: true,
-      data: performanceData,
-      dateRange: { startDate: start, endDate: end },
-      system: {
-        currentMemory: process.memoryUsage(),
-        uptime: process.uptime(),
-        cpuUsage: process.cpuUsage()
-      }
+    try {
+      // Simulate report generation
+      const reportId = `report-${Date.now()}`;
+      
+      // In real implementation, this would trigger background job for report generation
+      setTimeout(() => {
+        adminLogger.info('Report generation completed', {
+          userId: adminUser.id,
+          reportId,
+          reportType: type
+        });
+      }, 5000);
+
+      res.json({
+        success: true,
+        message: 'Report generation started',
+        data: {
+          reportId,
+          type,
+          period,
+          status: 'generating',
+          estimatedCompletion: new Date(Date.now() + 300000).toISOString() // 5 minutes
+        }
+      });
+    } catch (error) {
+      adminLogger.error('Failed to generate report', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate report',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * GET /admin/api/analytics/scheduled-reports
+ * Get scheduled reports
+ */
+router.get('/scheduled-reports',
+  requireAdminPermission(Permission.ANALYTICS_READ),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    
+    adminLogger.info('Scheduled reports accessed', {
+      userId: adminUser.id,
+      username: adminUser.username
     });
+
+    try {
+      // Mock scheduled reports
+      const mockScheduledReports = [
+        {
+          id: 'report-1',
+          name: 'Daily Game Balance Report',
+          type: 'balance',
+          schedule: 'daily',
+          lastGenerated: new Date(Date.now() - 86400000).toISOString(),
+          nextScheduled: new Date(Date.now() + 3600000).toISOString(),
+          status: 'active',
+          recipients: ['admin@example.com', 'balance-team@example.com']
+        },
+        {
+          id: 'report-2',
+          name: 'Weekly Player Engagement Summary',
+          type: 'engagement',
+          schedule: 'weekly',
+          lastGenerated: new Date(Date.now() - 604800000).toISOString(),
+          nextScheduled: new Date(Date.now() + 86400000 * 6).toISOString(),
+          status: 'active',
+          recipients: ['product@example.com', 'analytics@example.com']
+        },
+        {
+          id: 'report-3',
+          name: 'Monthly Health Assessment',
+          type: 'performance',
+          schedule: 'monthly',
+          lastGenerated: new Date(Date.now() - 2592000000).toISOString(),
+          nextScheduled: new Date(Date.now() + 86400000 * 15).toISOString(),
+          status: 'active',
+          recipients: ['leadership@example.com']
+        },
+        {
+          id: 'report-4',
+          name: 'Custom Retention Analysis',
+          type: 'custom',
+          schedule: 'on-demand',
+          lastGenerated: new Date(Date.now() - 432000000).toISOString(),
+          status: 'paused',
+          recipients: ['retention-team@example.com']
+        }
+      ];
+
+      res.json({
+        success: true,
+        data: mockScheduledReports
+      });
+    } catch (error) {
+      adminLogger.error('Failed to fetch scheduled reports', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch scheduled reports',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  })
+);
+
+/**
+ * POST /admin/api/analytics/scheduled-reports
+ * Create a new scheduled report
+ */
+router.post('/scheduled-reports',
+  requireAdminPermission(Permission.ANALYTICS_ADMIN),
+  adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response) => {
+    const adminUser = req.adminUser;
+    const { name, type, schedule, recipients } = req.body;
+    
+    adminLogger.info('Scheduled report created', {
+      userId: adminUser.id,
+      username: adminUser.username,
+      reportName: name,
+      reportType: type,
+      schedule
+    });
+
+    try {
+      const newReport = {
+        id: `report-${Date.now()}`,
+        name,
+        type,
+        schedule,
+        lastGenerated: null,
+        nextScheduled: schedule !== 'on-demand' ? new Date(Date.now() + 86400000).toISOString() : null,
+        status: 'active',
+        recipients: recipients ? recipients.split(',').map((email: string) => email.trim()) : [],
+        createdBy: adminUser.username,
+        createdAt: new Date().toISOString()
+      };
+
+      res.json({
+        success: true,
+        message: 'Scheduled report created successfully',
+        data: newReport
+      });
+    } catch (error) {
+      adminLogger.error('Failed to create scheduled report', {
+        userId: adminUser.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create scheduled report',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   })
 );
 
