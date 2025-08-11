@@ -519,12 +519,39 @@ interface IAdminSessionModel extends mongoose.Model<IAdminSession> {
 }
 
 // Create and export the model using admin connection (lazy initialization)
-let _AdminSession: mongoose.Model<IAdminSession, IAdminSessionModel>;
-export const AdminSession = new Proxy({} as mongoose.Model<IAdminSession, IAdminSessionModel>, {
-  get(target, prop) {
-    if (!_AdminSession) {
-      _AdminSession = getAdminConnection().model<IAdminSession, IAdminSessionModel>('AdminSession', AdminSessionSchema);
-    }
-    return (_AdminSession as any)[prop];
+let _AdminSession: mongoose.Model<IAdminSession, IAdminSessionModel> | null = null;
+
+export const getAdminSessionModel = (): mongoose.Model<IAdminSession, IAdminSessionModel> => {
+  if (!_AdminSession) {
+    const connection = getAdminConnection();
+    _AdminSession = connection.model<IAdminSession, IAdminSessionModel>('AdminSession', AdminSessionSchema);
   }
-});
+  return _AdminSession;
+};
+
+// Export a proxy that delegates to the actual model
+export const AdminSession = {
+  findOne: (...args: any[]) => getAdminSessionModel().findOne(...args),
+  find: (...args: any[]) => getAdminSessionModel().find(...args),
+  findById: (...args: any[]) => getAdminSessionModel().findById(...args),
+  findByIdAndUpdate: (...args: any[]) => getAdminSessionModel().findByIdAndUpdate(...args),
+  findByIdAndDelete: (...args: any[]) => getAdminSessionModel().findByIdAndDelete(...args),
+  create: (...args: any[]) => getAdminSessionModel().create(...args),
+  insertMany: (...args: any[]) => getAdminSessionModel().insertMany(...args),
+  updateOne: (...args: any[]) => getAdminSessionModel().updateOne(...args),
+  updateMany: (...args: any[]) => getAdminSessionModel().updateMany(...args),
+  deleteOne: (...args: any[]) => getAdminSessionModel().deleteOne(...args),
+  deleteMany: (...args: any[]) => getAdminSessionModel().deleteMany(...args),
+  countDocuments: (...args: any[]) => getAdminSessionModel().countDocuments(...args),
+  aggregate: (...args: any[]) => getAdminSessionModel().aggregate(...args),
+  distinct: (...args: any[]) => getAdminSessionModel().distinct(...args),
+  exists: (...args: any[]) => getAdminSessionModel().exists(...args),
+  // Static methods
+  createSession: (...args: any[]) => getAdminSessionModel().createSession(...args),
+  findActiveSession: (...args: any[]) => getAdminSessionModel().findActiveSession(...args),
+  findUserSessions: (...args: any[]) => getAdminSessionModel().findUserSessions(...args),
+  terminateUserSessions: (...args: any[]) => getAdminSessionModel().terminateUserSessions(...args),
+  cleanupExpiredSessions: (...args: any[]) => getAdminSessionModel().cleanupExpiredSessions(...args),
+  getSessionStatistics: (...args: any[]) => getAdminSessionModel().getSessionStatistics(...args),
+  getSuspiciousActivities: (...args: any[]) => getAdminSessionModel().getSuspiciousActivities(...args),
+} as mongoose.Model<IAdminSession, IAdminSessionModel>;

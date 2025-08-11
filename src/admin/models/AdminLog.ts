@@ -403,12 +403,42 @@ interface IAdminLogModel extends mongoose.Model<IAdminLog> {
 type AdminLogModelType = IAdminLogModel;
 
 // Create and export the model using admin connection (lazy initialization)
-let _AdminLog: mongoose.Model<IAdminLog, IAdminLogModel>;
-export const AdminLog = new Proxy({} as mongoose.Model<IAdminLog, IAdminLogModel>, {
-  get(target, prop) {
-    if (!_AdminLog) {
-      _AdminLog = getAdminConnection().model<IAdminLog, IAdminLogModel>('AdminLog', AdminLogSchema);
-    }
-    return (_AdminLog as any)[prop];
+let _AdminLog: mongoose.Model<IAdminLog, IAdminLogModel> | null = null;
+
+export const getAdminLogModel = (): mongoose.Model<IAdminLog, IAdminLogModel> => {
+  if (!_AdminLog) {
+    const connection = getAdminConnection();
+    _AdminLog = connection.model<IAdminLog, IAdminLogModel>('AdminLog', AdminLogSchema);
   }
-});
+  return _AdminLog;
+};
+
+// Export a proxy that delegates to the actual model
+export const AdminLog = {
+  findOne: (...args: any[]) => getAdminLogModel().findOne(...args),
+  find: (...args: any[]) => getAdminLogModel().find(...args),
+  findById: (...args: any[]) => getAdminLogModel().findById(...args),
+  findByIdAndUpdate: (...args: any[]) => getAdminLogModel().findByIdAndUpdate(...args),
+  findByIdAndDelete: (...args: any[]) => getAdminLogModel().findByIdAndDelete(...args),
+  create: (...args: any[]) => getAdminLogModel().create(...args),
+  insertMany: (...args: any[]) => getAdminLogModel().insertMany(...args),
+  updateOne: (...args: any[]) => getAdminLogModel().updateOne(...args),
+  updateMany: (...args: any[]) => getAdminLogModel().updateMany(...args),
+  deleteOne: (...args: any[]) => getAdminLogModel().deleteOne(...args),
+  deleteMany: (...args: any[]) => getAdminLogModel().deleteMany(...args),
+  countDocuments: (...args: any[]) => getAdminLogModel().countDocuments(...args),
+  aggregate: (...args: any[]) => getAdminLogModel().aggregate(...args),
+  distinct: (...args: any[]) => getAdminLogModel().distinct(...args),
+  exists: (...args: any[]) => getAdminLogModel().exists(...args),
+  // Static methods
+  findByUser: (...args: any[]) => getAdminLogModel().findByUser(...args),
+  findByAction: (...args: any[]) => getAdminLogModel().findByAction(...args),
+  findByLevel: (...args: any[]) => getAdminLogModel().findByLevel(...args),
+  findByDateRange: (...args: any[]) => getAdminLogModel().findByDateRange(...args),
+  findSecurityEvents: (...args: any[]) => getAdminLogModel().findSecurityEvents(...args),
+  getLogStatistics: (...args: any[]) => getAdminLogModel().getLogStatistics(...args),
+  cleanupOldLogs: (...args: any[]) => getAdminLogModel().cleanupOldLogs(...args),
+  exportLogs: (...args: any[]) => getAdminLogModel().exportLogs(...args),
+  searchLogs: (...args: any[]) => getAdminLogModel().searchLogs(...args),
+  getAuditTrail: (...args: any[]) => getAdminLogModel().getAuditTrail(...args),
+} as mongoose.Model<IAdminLog, IAdminLogModel>;

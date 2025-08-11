@@ -1,9 +1,9 @@
-import { getAdminConnection } from '../config/database';
-import { adminLogger } from '../config/logger';
+import { getAdminConnection } from "../config/database";
+import { adminLogger } from "../config/logger";
 
 // Import all migrations
-import * as migration001 from './001_admin_collections_setup';
-import * as migration002 from './002_admin_performance_indexes';
+import * as migration001 from "./001_admin_collections_setup";
+import * as migration002 from "./002_admin_performance_indexes";
 
 // Migration interface
 interface Migration {
@@ -18,13 +18,10 @@ interface Migration {
 }
 
 // Registry of all migrations
-const migrations: Migration[] = [
-  migration001,
-  migration002
-];
+const migrations: Migration[] = [migration001, migration002];
 
 // Migration tracking collection
-const MIGRATION_COLLECTION = 'admin_migrations';
+const MIGRATION_COLLECTION = "admin_migrations";
 
 interface MigrationRecord {
   version: string;
@@ -32,7 +29,7 @@ interface MigrationRecord {
   description: string;
   appliedAt: Date;
   rollbackAt?: Date;
-  status: 'applied' | 'rolled_back';
+  status: "applied" | "rolled_back";
 }
 
 /**
@@ -49,11 +46,17 @@ function getMigrationCollection() {
 async function getAppliedMigrations(): Promise<MigrationRecord[]> {
   try {
     const collection = getMigrationCollection();
-    return await collection.find({ status: 'applied' }).sort({ version: 1 }).toArray();
+    return await collection
+      .find({ status: "applied" })
+      .sort({ version: 1 })
+      .toArray();
   } catch (error) {
-    adminLogger.warn('Could not get applied migrations, assuming none applied', {
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    adminLogger.warn(
+      "Could not get applied migrations, assuming none applied",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      }
+    );
     return [];
   }
 }
@@ -68,9 +71,9 @@ async function recordMigrationApplied(migration: Migration): Promise<void> {
     name: migration.migrationInfo.name,
     description: migration.migrationInfo.description,
     appliedAt: new Date(),
-    status: 'applied'
+    status: "applied",
   };
-  
+
   await collection.replaceOne(
     { version: migration.migrationInfo.version },
     record,
@@ -88,8 +91,8 @@ async function recordMigrationRolledBack(migration: Migration): Promise<void> {
     {
       $set: {
         rollbackAt: new Date(),
-        status: 'rolled_back'
-      }
+        status: "rolled_back",
+      },
     }
   );
 }
@@ -99,29 +102,31 @@ async function recordMigrationRolledBack(migration: Migration): Promise<void> {
  */
 export async function runMigrations(): Promise<void> {
   try {
-    adminLogger.info('Starting admin database migrations...');
-    
+    adminLogger.info("Starting admin database migrations...");
+
     const appliedMigrations = await getAppliedMigrations();
-    const appliedVersions = new Set(appliedMigrations.map(m => m.version));
-    
+    const appliedVersions = new Set(appliedMigrations.map((m) => m.version));
+
     let migrationsRun = 0;
-    
+
     for (const migration of migrations) {
       const version = migration.migrationInfo.version;
-      
+
       if (!appliedVersions.has(version)) {
-        adminLogger.info(`Running migration ${version}: ${migration.migrationInfo.name}`);
-        
+        adminLogger.info(
+          `Running migration ${version}: ${migration.migrationInfo.name}`
+        );
+
         try {
           await migration.up();
           await recordMigrationApplied(migration);
           migrationsRun++;
-          
+
           adminLogger.info(`Migration ${version} completed successfully`);
         } catch (error) {
           adminLogger.error(`Migration ${version} failed`, {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined
+            error: error instanceof Error ? error.message : "Unknown error",
+            stack: error instanceof Error ? error.stack : undefined,
           });
           throw error;
         }
@@ -129,17 +134,18 @@ export async function runMigrations(): Promise<void> {
         adminLogger.debug(`Migration ${version} already applied, skipping`);
       }
     }
-    
+
     if (migrationsRun > 0) {
-      adminLogger.info(`Admin database migrations completed. ${migrationsRun} migrations applied.`);
+      adminLogger.info(
+        `Admin database migrations completed. ${migrationsRun} migrations applied.`
+      );
     } else {
-      adminLogger.info('All admin database migrations are up to date.');
+      adminLogger.info("All admin database migrations are up to date.");
     }
-    
   } catch (error) {
-    adminLogger.error('Admin database migrations failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+    adminLogger.error("Admin database migrations failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw error;
   }
@@ -150,42 +156,49 @@ export async function runMigrations(): Promise<void> {
  */
 export async function rollbackLastMigration(): Promise<void> {
   try {
-    adminLogger.info('Rolling back last admin database migration...');
-    
+    adminLogger.info("Rolling back last admin database migration...");
+
     const appliedMigrations = await getAppliedMigrations();
-    
+
     if (appliedMigrations.length === 0) {
-      adminLogger.info('No migrations to rollback');
+      adminLogger.info("No migrations to rollback");
       return;
     }
-    
+
     // Get the last applied migration
     const lastMigration = appliedMigrations[appliedMigrations.length - 1];
-    const migration = migrations.find(m => m.migrationInfo.version === lastMigration.version);
-    
+    const migration = migrations.find(
+      (m) => m.migrationInfo.version === lastMigration.version
+    );
+
     if (!migration) {
-      throw new Error(`Migration ${lastMigration.version} not found in migration registry`);
+      throw new Error(
+        `Migration ${lastMigration.version} not found in migration registry`
+      );
     }
-    
-    adminLogger.info(`Rolling back migration ${lastMigration.version}: ${lastMigration.name}`);
-    
+
+    adminLogger.info(
+      `Rolling back migration ${lastMigration.version}: ${lastMigration.name}`
+    );
+
     try {
       await migration.down();
       await recordMigrationRolledBack(migration);
-      
-      adminLogger.info(`Migration ${lastMigration.version} rolled back successfully`);
+
+      adminLogger.info(
+        `Migration ${lastMigration.version} rolled back successfully`
+      );
     } catch (error) {
       adminLogger.error(`Migration ${lastMigration.version} rollback failed`, {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }
-    
   } catch (error) {
-    adminLogger.error('Admin database migration rollback failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+    adminLogger.error("Admin database migration rollback failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw error;
   }
@@ -196,48 +209,68 @@ export async function rollbackLastMigration(): Promise<void> {
  */
 export async function rollbackToVersion(targetVersion: string): Promise<void> {
   try {
-    adminLogger.info(`Rolling back admin database to migration version ${targetVersion}...`);
-    
+    adminLogger.info(
+      `Rolling back admin database to migration version ${targetVersion}...`
+    );
+
     const appliedMigrations = await getAppliedMigrations();
-    const targetIndex = appliedMigrations.findIndex(m => m.version === targetVersion);
-    
+    const targetIndex = appliedMigrations.findIndex(
+      (m) => m.version === targetVersion
+    );
+
     if (targetIndex === -1) {
-      throw new Error(`Target migration version ${targetVersion} not found or not applied`);
+      throw new Error(
+        `Target migration version ${targetVersion} not found or not applied`
+      );
     }
-    
+
     // Rollback migrations in reverse order
-    const migrationsToRollback = appliedMigrations.slice(targetIndex + 1).reverse();
-    
+    const migrationsToRollback = appliedMigrations
+      .slice(targetIndex + 1)
+      .reverse();
+
     for (const migrationRecord of migrationsToRollback) {
-      const migration = migrations.find(m => m.migrationInfo.version === migrationRecord.version);
-      
+      const migration = migrations.find(
+        (m) => m.migrationInfo.version === migrationRecord.version
+      );
+
       if (!migration) {
-        adminLogger.warn(`Migration ${migrationRecord.version} not found in registry, skipping rollback`);
+        adminLogger.warn(
+          `Migration ${migrationRecord.version} not found in registry, skipping rollback`
+        );
         continue;
       }
-      
-      adminLogger.info(`Rolling back migration ${migrationRecord.version}: ${migrationRecord.name}`);
-      
+
+      adminLogger.info(
+        `Rolling back migration ${migrationRecord.version}: ${migrationRecord.name}`
+      );
+
       try {
         await migration.down();
         await recordMigrationRolledBack(migration);
-        
-        adminLogger.info(`Migration ${migrationRecord.version} rolled back successfully`);
+
+        adminLogger.info(
+          `Migration ${migrationRecord.version} rolled back successfully`
+        );
       } catch (error) {
-        adminLogger.error(`Migration ${migrationRecord.version} rollback failed`, {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined
-        });
+        adminLogger.error(
+          `Migration ${migrationRecord.version} rollback failed`,
+          {
+            error: error instanceof Error ? error.message : "Unknown error",
+            stack: error instanceof Error ? error.stack : undefined,
+          }
+        );
         throw error;
       }
     }
-    
-    adminLogger.info(`Successfully rolled back to migration version ${targetVersion}`);
-    
+
+    adminLogger.info(
+      `Successfully rolled back to migration version ${targetVersion}`
+    );
   } catch (error) {
-    adminLogger.error('Admin database migration rollback failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+    adminLogger.error("Admin database migration rollback failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw error;
   }
@@ -254,41 +287,46 @@ export async function getMigrationStatus(): Promise<{
     version: string;
     name: string;
     description: string;
-    status: 'applied' | 'pending' | 'rolled_back';
+    status: "applied" | "pending" | "rolled_back";
     appliedAt?: Date;
     rollbackAt?: Date;
   }>;
 }> {
   try {
     const appliedMigrations = await getAppliedMigrations();
-    const appliedVersions = new Map(appliedMigrations.map(m => [m.version, m]));
-    
-    const migrationStatus = migrations.map(migration => {
+    const appliedVersions = new Map(
+      appliedMigrations.map((m) => [m.version, m])
+    );
+
+    const migrationStatus = migrations.map((migration) => {
       const applied = appliedVersions.get(migration.migrationInfo.version);
-      
+
       return {
         version: migration.migrationInfo.version,
         name: migration.migrationInfo.name,
         description: migration.migrationInfo.description,
-        status: applied ? applied.status : 'pending' as const,
+        status: applied ? applied.status : ("pending" as const),
         appliedAt: applied?.appliedAt,
-        rollbackAt: applied?.rollbackAt
+        rollbackAt: applied?.rollbackAt,
       };
     });
-    
-    const appliedCount = migrationStatus.filter(m => m.status === 'applied').length;
-    const pendingCount = migrationStatus.filter(m => m.status === 'pending').length;
-    
+
+    const appliedCount = migrationStatus.filter(
+      (m) => m.status === "applied"
+    ).length;
+    const pendingCount = migrationStatus.filter(
+      (m) => m.status === "pending"
+    ).length;
+
     return {
       totalMigrations: migrations.length,
       appliedMigrations: appliedCount,
       pendingMigrations: pendingCount,
-      migrations: migrationStatus
+      migrations: migrationStatus,
     };
-    
   } catch (error) {
-    adminLogger.error('Failed to get migration status', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+    adminLogger.error("Failed to get migration status", {
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     throw error;
   }
@@ -299,50 +337,56 @@ export async function getMigrationStatus(): Promise<{
  */
 export async function resetMigrations(): Promise<void> {
   try {
-    adminLogger.warn('Resetting all admin database migrations...');
-    
+    adminLogger.warn("Resetting all admin database migrations...");
+
     const appliedMigrations = await getAppliedMigrations();
-    
+
     // Rollback all migrations in reverse order
     for (const migrationRecord of appliedMigrations.reverse()) {
-      const migration = migrations.find(m => m.migrationInfo.version === migrationRecord.version);
-      
+      const migration = migrations.find(
+        (m) => m.migrationInfo.version === migrationRecord.version
+      );
+
       if (!migration) {
-        adminLogger.warn(`Migration ${migrationRecord.version} not found in registry, skipping rollback`);
+        adminLogger.warn(
+          `Migration ${migrationRecord.version} not found in registry, skipping rollback`
+        );
         continue;
       }
-      
-      adminLogger.info(`Rolling back migration ${migrationRecord.version}: ${migrationRecord.name}`);
-      
+
+      adminLogger.info(
+        `Rolling back migration ${migrationRecord.version}: ${migrationRecord.name}`
+      );
+
       try {
         await migration.down();
-        adminLogger.info(`Migration ${migrationRecord.version} rolled back successfully`);
+        adminLogger.info(
+          `Migration ${migrationRecord.version} rolled back successfully`
+        );
       } catch (error) {
-        adminLogger.error(`Migration ${migrationRecord.version} rollback failed`, {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
+        adminLogger.error(
+          `Migration ${migrationRecord.version} rollback failed`,
+          {
+            error: error instanceof Error ? error.message : "Unknown error",
+          }
+        );
         // Continue with other rollbacks even if one fails
       }
     }
-    
+
     // Clear migration tracking collection
     const collection = getMigrationCollection();
     await collection.deleteMany({});
-    
-    adminLogger.warn('All admin database migrations have been reset');
-    
+
+    adminLogger.warn("All admin database migrations have been reset");
   } catch (error) {
-    adminLogger.error('Failed to reset migrations', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+    adminLogger.error("Failed to reset migrations", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw error;
   }
 }
 
 // Export migration utilities
-export {
-  migrations,
-  Migration,
-  MigrationRecord
-};
+export { migrations, Migration, MigrationRecord };

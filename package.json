@@ -23,8 +23,12 @@
     "migrate:up": "ts-node src/migrations/runner.ts up",
     "migrate:down": "ts-node src/migrations/runner.ts down",
     "migrate:status": "ts-node src/migrations/runner.ts status",
+    "admin:migrate": "ts-node run-admin-migrations.ts",
+    "admin:migrate:js": "node run-admin-migrations.js",
+    "admin:create-user": "node create-admin-user.js",
     "seed": "ts-node src/utils/seeder.ts",
-    "db:setup": "npm run migrate:up && npm run seed"
+    "db:setup": "npm run migrate:up && npm run seed",
+    "admin:setup": "npm run admin:create-user"
   },
   "keywords": [],
   "author": "",

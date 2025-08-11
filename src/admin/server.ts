@@ -82,7 +82,7 @@ const adminRateLimit = rateLimit({
   }
 });
 
-app.use(adminRateLimit);
+// app.use(adminRateLimit);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

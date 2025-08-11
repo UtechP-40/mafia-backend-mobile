@@ -283,12 +283,32 @@ SuperUserSchema.pre('save', function(next) {
 });
 
 // Create and export the model using admin connection (lazy initialization)
-let _SuperUser: mongoose.Model<ISuperUser>;
-export const SuperUser = new Proxy({} as mongoose.Model<ISuperUser>, {
-  get(target, prop) {
-    if (!_SuperUser) {
-      _SuperUser = getAdminConnection().model<ISuperUser>('SuperUser', SuperUserSchema);
-    }
-    return (_SuperUser as any)[prop];
+let _SuperUser: mongoose.Model<ISuperUser> | null = null;
+
+export const getSuperUserModel = (): mongoose.Model<ISuperUser> => {
+  if (!_SuperUser) {
+    const connection = getAdminConnection();
+    _SuperUser = connection.model<ISuperUser>('SuperUser', SuperUserSchema);
   }
-});
+  return _SuperUser;
+};
+
+// Export a proxy that delegates to the actual model
+export const SuperUser = {
+  findOne: (...args: any[]) => getSuperUserModel().findOne(...args),
+  find: (...args: any[]) => getSuperUserModel().find(...args),
+  findById: (...args: any[]) => getSuperUserModel().findById(...args),
+  findByIdAndUpdate: (...args: any[]) => getSuperUserModel().findByIdAndUpdate(...args),
+  findByIdAndDelete: (...args: any[]) => getSuperUserModel().findByIdAndDelete(...args),
+  create: (...args: any[]) => getSuperUserModel().create(...args),
+  insertMany: (...args: any[]) => getSuperUserModel().insertMany(...args),
+  updateOne: (...args: any[]) => getSuperUserModel().updateOne(...args),
+  updateMany: (...args: any[]) => getSuperUserModel().updateMany(...args),
+  deleteOne: (...args: any[]) => getSuperUserModel().deleteOne(...args),
+  deleteMany: (...args: any[]) => getSuperUserModel().deleteMany(...args),
+  countDocuments: (...args: any[]) => getSuperUserModel().countDocuments(...args),
+  aggregate: (...args: any[]) => getSuperUserModel().aggregate(...args),
+  distinct: (...args: any[]) => getSuperUserModel().distinct(...args),
+  exists: (...args: any[]) => getSuperUserModel().exists(...args),
+  // Add any other methods you need
+} as mongoose.Model<ISuperUser>;

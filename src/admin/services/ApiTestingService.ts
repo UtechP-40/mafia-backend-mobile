@@ -1,8 +1,8 @@
-import express, { Router, Request, Response } from 'express';
-import axios, { AxiosResponse, AxiosError } from 'axios';
-import { performance } from 'perf_hooks';
-import { adminLogger } from '../config/logger';
-import { AdminLog } from '../models/AdminLog';
+import express, { Router, Request, Response } from "express";
+import axios, { AxiosResponse, AxiosError } from "axios";
+import { performance } from "perf_hooks";
+import { adminLogger } from "../config/logger";
+import { AdminLog } from "../models/AdminLog";
 
 export interface ApiEndpoint {
   id: string;
@@ -22,7 +22,7 @@ export interface ApiEndpoint {
 
 export interface ApiParameter {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  type: "string" | "number" | "boolean" | "object" | "array";
   required: boolean;
   description?: string;
   example?: any;
@@ -64,7 +64,15 @@ export interface PerformanceMetrics {
 }
 
 export interface ValidationRule {
-  type: 'required' | 'minLength' | 'maxLength' | 'pattern' | 'min' | 'max' | 'email' | 'custom';
+  type:
+    | "required"
+    | "minLength"
+    | "maxLength"
+    | "pattern"
+    | "min"
+    | "max"
+    | "email"
+    | "custom";
   value?: any;
   message?: string;
 }
@@ -92,9 +100,9 @@ export interface MockResponse {
 }
 
 export interface MockCondition {
-  type: 'header' | 'query' | 'body' | 'path';
+  type: "header" | "query" | "body" | "path";
   key: string;
-  operator: 'equals' | 'contains' | 'regex' | 'exists';
+  operator: "equals" | "contains" | "regex" | "exists";
   value?: any;
 }
 
@@ -127,9 +135,12 @@ export class ApiTestingService {
     const endpoints: ApiEndpoint[] = [];
     const routes = this.extractRoutes(app);
 
-    routes.forEach(route => {
+    routes.forEach((route) => {
       const endpoint: ApiEndpoint = {
-        id: `${route.method.toUpperCase()}_${route.path.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        id: `${route.method.toUpperCase()}_${route.path.replace(
+          /[^a-zA-Z0-9]/g,
+          "_"
+        )}`,
         path: route.path,
         method: route.method.toUpperCase(),
         description: this.generateDescription(route.path, route.method),
@@ -137,7 +148,7 @@ export class ApiTestingService {
         responses: this.generateDefaultResponses(),
         tags: this.generateTags(route.path),
         requiresAuth: this.inferAuthRequirement(route.path),
-        version: '1.0.0'
+        version: "1.0.0",
       };
 
       endpoints.push(endpoint);
@@ -151,13 +162,15 @@ export class ApiTestingService {
   /**
    * Extract routes from Express app
    */
-  private static extractRoutes(app: express.Application): Array<{path: string, method: string}> {
-    const routes: Array<{path: string, method: string}> = [];
-    
+  private static extractRoutes(
+    app: express.Application
+  ): Array<{ path: string; method: string }> {
+    const routes: Array<{ path: string; method: string }> = [];
+
     // Extract routes from app._router
     const router = (app as any)._router;
     if (router && router.stack) {
-      this.extractRoutesFromStack(router.stack, '', routes);
+      this.extractRoutesFromStack(router.stack, "", routes);
     }
 
     return routes;
@@ -166,25 +179,33 @@ export class ApiTestingService {
   /**
    * Recursively extract routes from router stack
    */
-  private static extractRoutesFromStack(stack: any[], basePath: string, routes: Array<{path: string, method: string}>) {
-    stack.forEach(layer => {
+  private static extractRoutesFromStack(
+    stack: any[],
+    basePath: string,
+    routes: Array<{ path: string; method: string }>
+  ) {
+    stack.forEach((layer) => {
       if (layer.route) {
         // Direct route
         const path = basePath + layer.route.path;
-        Object.keys(layer.route.methods).forEach(method => {
+        Object.keys(layer.route.methods).forEach((method) => {
           if (layer.route.methods[method]) {
             routes.push({ path, method: method.toUpperCase() });
           }
         });
-      } else if (layer.name === 'router' && layer.handle.stack) {
+      } else if (layer.name === "router" && layer.handle.stack) {
         // Nested router
         const routerPath = layer.regexp.source
-          .replace('\\', '')
-          .replace('(?=\\/|$)', '')
-          .replace(/\$.*/, '')
-          .replace(/\\\//g, '/');
-        
-        this.extractRoutesFromStack(layer.handle.stack, basePath + routerPath, routes);
+          .replace("\\", "")
+          .replace("(?=\\/|$)", "")
+          .replace(/\$.*/, "")
+          .replace(/\\\//g, "/");
+
+        this.extractRoutesFromStack(
+          layer.handle.stack,
+          basePath + routerPath,
+          routes
+        );
       }
     });
   }
@@ -193,19 +214,21 @@ export class ApiTestingService {
    * Generate description for endpoint
    */
   private static generateDescription(path: string, method: string): string {
-    const pathParts = path.split('/').filter(part => part);
-    const resource = pathParts[pathParts.length - 1] || 'resource';
-    
+    const pathParts = path.split("/").filter((part) => part);
+    const resource = pathParts[pathParts.length - 1] || "resource";
+
     switch (method.toUpperCase()) {
-      case 'GET':
-        return path.includes(':') ? `Get specific ${resource}` : `Get all ${resource}`;
-      case 'POST':
+      case "GET":
+        return path.includes(":")
+          ? `Get specific ${resource}`
+          : `Get all ${resource}`;
+      case "POST":
         return `Create new ${resource}`;
-      case 'PUT':
+      case "PUT":
         return `Update ${resource}`;
-      case 'DELETE':
+      case "DELETE":
         return `Delete ${resource}`;
-      case 'PATCH':
+      case "PATCH":
         return `Partially update ${resource}`;
       default:
         return `${method.toUpperCase()} ${resource}`;
@@ -218,16 +241,17 @@ export class ApiTestingService {
   private static inferParameters(path: string): ApiParameter[] {
     const parameters: ApiParameter[] = [];
     const pathParams = path.match(/:(\w+)/g);
-    
+
     if (pathParams) {
-      pathParams.forEach(param => {
+      pathParams.forEach((param) => {
         const name = param.substring(1);
         parameters.push({
           name,
-          type: 'string',
+          type: "string",
           required: true,
           description: `${name} identifier`,
-          example: name === 'id' ? '507f1f77bcf86cd799439011' : `example_${name}`
+          example:
+            name === "id" ? "507f1f77bcf86cd799439011" : `example_${name}`,
         });
       });
     }
@@ -242,24 +266,24 @@ export class ApiTestingService {
     return [
       {
         statusCode: 200,
-        description: 'Success',
-        example: { success: true, message: 'Operation completed successfully' }
+        description: "Success",
+        example: { success: true, message: "Operation completed successfully" },
       },
       {
         statusCode: 400,
-        description: 'Bad Request',
-        example: { success: false, message: 'Invalid request data' }
+        description: "Bad Request",
+        example: { success: false, message: "Invalid request data" },
       },
       {
         statusCode: 401,
-        description: 'Unauthorized',
-        example: { success: false, message: 'Authentication required' }
+        description: "Unauthorized",
+        example: { success: false, message: "Authentication required" },
       },
       {
         statusCode: 500,
-        description: 'Internal Server Error',
-        example: { success: false, message: 'Internal server error' }
-      }
+        description: "Internal Server Error",
+        example: { success: false, message: "Internal server error" },
+      },
     ];
   }
 
@@ -268,16 +292,18 @@ export class ApiTestingService {
    */
   private static generateTags(path: string): string[] {
     const tags: string[] = [];
-    const pathParts = path.split('/').filter(part => part && !part.startsWith(':'));
-    
+    const pathParts = path
+      .split("/")
+      .filter((part) => part && !part.startsWith(":"));
+
     if (pathParts.length > 0) {
       tags.push(pathParts[0]);
     }
-    
-    if (path.includes('/admin/')) {
-      tags.push('admin');
+
+    if (path.includes("/admin/")) {
+      tags.push("admin");
     }
-    
+
     return tags;
   }
 
@@ -285,16 +311,16 @@ export class ApiTestingService {
    * Infer if endpoint requires authentication
    */
   private static inferAuthRequirement(path: string): boolean {
-    const authPaths = ['/auth/login', '/auth/register', '/health'];
-    return !authPaths.some(authPath => path.includes(authPath));
+    const authPaths = ["/auth/login", "/auth/register", "/health"];
+    return !authPaths.some((authPath) => path.includes(authPath));
   }
 
   /**
    * Test API endpoint
    */
   static async testEndpoint(
-    endpointId: string, 
-    baseUrl: string, 
+    endpointId: string,
+    baseUrl: string,
     options: {
       headers?: Record<string, string>;
       data?: any;
@@ -319,7 +345,7 @@ export class ApiTestingService {
       statusCode: 0,
       responseTime: 0,
       success: false,
-      requestData: options.data
+      requestData: options.data,
     };
 
     try {
@@ -330,7 +356,7 @@ export class ApiTestingService {
         headers: options.headers || {},
         data: options.data,
         timeout: options.timeout || 10000,
-        validateStatus: () => true // Don't throw on any status code
+        validateStatus: () => true, // Don't throw on any status code
       };
 
       const response: AxiosResponse = await axios(config);
@@ -349,19 +375,19 @@ export class ApiTestingService {
           heapTotal: endMemory.heapTotal - startMemory.heapTotal,
           heapUsed: endMemory.heapUsed - startMemory.heapUsed,
           external: endMemory.external - startMemory.external,
-          arrayBuffers: endMemory.arrayBuffers - startMemory.arrayBuffers
+          arrayBuffers: endMemory.arrayBuffers - startMemory.arrayBuffers,
         },
-        cpuUsage: endCpu
+        cpuUsage: endCpu,
       };
 
       // Update usage analytics
       this.updateUsageAnalytics(endpoint.path, endpoint.method, testResult);
-
     } catch (error) {
       const endTime = performance.now();
       testResult.responseTime = endTime - startTime;
-      testResult.error = error instanceof Error ? error.message : 'Unknown error';
-      
+      testResult.error =
+        error instanceof Error ? error.message : "Unknown error";
+
       if (axios.isAxiosError(error)) {
         testResult.statusCode = error.response?.status || 0;
         testResult.responseData = error.response?.data;
@@ -370,7 +396,7 @@ export class ApiTestingService {
 
     // Store test result
     this.testResults.push(testResult);
-    
+
     // Update endpoint with last tested time
     endpoint.lastTested = new Date();
     if (!endpoint.testResults) {
@@ -380,27 +406,27 @@ export class ApiTestingService {
 
     // Log test result
     await AdminLog.create({
-      userId: 'system',
-      action: 'api_test',
-      resource: 'endpoint',
+      userId: "system",
+      action: "api_test",
+      resource: "endpoint",
       resourceId: endpointId,
       details: {
         endpoint: endpoint.path,
         method: endpoint.method,
         success: testResult.success,
         responseTime: testResult.responseTime,
-        statusCode: testResult.statusCode
+        statusCode: testResult.statusCode,
       },
-      ipAddress: 'localhost',
-      userAgent: 'ApiTestingService'
+      ipAddress: "localhost",
+      userAgent: "ApiTestingService",
     });
 
-    adminLogger.info('API endpoint tested', {
+    adminLogger.info("API endpoint tested", {
       endpoint: endpoint.path,
       method: endpoint.method,
       success: testResult.success,
       responseTime: testResult.responseTime,
-      statusCode: testResult.statusCode
+      statusCode: testResult.statusCode,
     });
 
     return testResult;
@@ -409,7 +435,11 @@ export class ApiTestingService {
   /**
    * Update usage analytics
    */
-  private static updateUsageAnalytics(path: string, method: string, testResult: TestResult) {
+  private static updateUsageAnalytics(
+    path: string,
+    method: string,
+    testResult: TestResult
+  ) {
     const key = `${method}_${path}`;
     const existing = this.usageAnalytics.get(key);
 
@@ -420,12 +450,22 @@ export class ApiTestingService {
       } else {
         existing.failedRequests++;
       }
-      existing.averageResponseTime = (existing.averageResponseTime + testResult.responseTime) / 2;
-      existing.minResponseTime = Math.min(existing.minResponseTime, testResult.responseTime);
-      existing.maxResponseTime = Math.max(existing.maxResponseTime, testResult.responseTime);
+      existing.averageResponseTime =
+        (existing.averageResponseTime + testResult.responseTime) / 2;
+      existing.minResponseTime = Math.min(
+        existing.minResponseTime,
+        testResult.responseTime
+      );
+      existing.maxResponseTime = Math.max(
+        existing.maxResponseTime,
+        testResult.responseTime
+      );
       existing.lastAccessed = new Date();
-      existing.errorRate = (existing.failedRequests / existing.totalRequests) * 100;
-      existing.popularityScore = existing.totalRequests * (existing.successfulRequests / existing.totalRequests);
+      existing.errorRate =
+        (existing.failedRequests / existing.totalRequests) * 100;
+      existing.popularityScore =
+        existing.totalRequests *
+        (existing.successfulRequests / existing.totalRequests);
     } else {
       this.usageAnalytics.set(key, {
         endpoint: path,
@@ -438,7 +478,7 @@ export class ApiTestingService {
         maxResponseTime: testResult.responseTime,
         lastAccessed: new Date(),
         errorRate: testResult.success ? 0 : 100,
-        popularityScore: testResult.success ? 1 : 0
+        popularityScore: testResult.success ? 1 : 0,
       });
     }
   }
@@ -472,7 +512,7 @@ export class ApiTestingService {
       duration = 30000, // 30 seconds
       requests = 100,
       headers,
-      data
+      data,
     } = options;
 
     const results: TestResult[] = [];
@@ -485,16 +525,16 @@ export class ApiTestingService {
 
     // Run concurrent requests
     const promises: Promise<TestResult>[] = [];
-    
-    while (requestCount < requests && (Date.now() - startTime) < duration) {
+
+    while (requestCount < requests && Date.now() - startTime < duration) {
       for (let i = 0; i < concurrency && requestCount < requests; i++) {
         promises.push(runTest());
         requestCount++;
       }
 
       const batchResults = await Promise.allSettled(promises);
-      batchResults.forEach(result => {
-        if (result.status === 'fulfilled') {
+      batchResults.forEach((result) => {
+        if (result.status === "fulfilled") {
           results.push(result.value);
         }
       });
@@ -503,33 +543,36 @@ export class ApiTestingService {
     }
 
     // Calculate statistics
-    const successfulRequests = results.filter(r => r.success).length;
+    const successfulRequests = results.filter((r) => r.success).length;
     const failedRequests = results.length - successfulRequests;
-    const responseTimes = results.map(r => r.responseTime);
+    const responseTimes = results.map((r) => r.responseTime);
     const totalTime = Date.now() - startTime;
 
     return {
       totalRequests: results.length,
       successfulRequests,
       failedRequests,
-      averageResponseTime: responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length,
+      averageResponseTime:
+        responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length,
       minResponseTime: Math.min(...responseTimes),
       maxResponseTime: Math.max(...responseTimes),
       requestsPerSecond: (results.length / totalTime) * 1000,
       errorRate: (failedRequests / results.length) * 100,
-      results
+      results,
     };
   }
 
   /**
    * Create test collection
    */
-  static createCollection(collection: Omit<TestCollection, 'id' | 'createdAt' | 'updatedAt'>): TestCollection {
+  static createCollection(
+    collection: Omit<TestCollection, "id" | "createdAt" | "updatedAt">
+  ): TestCollection {
     const newCollection: TestCollection = {
       ...collection,
       id: `collection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     this.collections.set(newCollection.id, newCollection);
@@ -552,18 +595,21 @@ export class ApiTestingService {
       throw new Error(`Collection ${collectionId} not found`);
     }
 
-    const environment = this.environments.get(options.environment || 'default') || {};
+    const environment =
+      this.environments.get(options.environment || "default") || {};
     const results: TestResult[] = [];
 
     if (options.parallel) {
       // Run tests in parallel
-      const promises = collection.endpoints.map(endpointId =>
-        this.testEndpoint(endpointId, baseUrl, { environment: options.environment })
+      const promises = collection.endpoints.map((endpointId) =>
+        this.testEndpoint(endpointId, baseUrl, {
+          environment: options.environment,
+        })
       );
-      
+
       const settledResults = await Promise.allSettled(promises);
-      settledResults.forEach(result => {
-        if (result.status === 'fulfilled') {
+      settledResults.forEach((result) => {
+        if (result.status === "fulfilled") {
           results.push(result.value);
         }
       });
@@ -571,13 +617,15 @@ export class ApiTestingService {
       // Run tests sequentially
       for (const endpointId of collection.endpoints) {
         try {
-          const result = await this.testEndpoint(endpointId, baseUrl, { environment: options.environment });
+          const result = await this.testEndpoint(endpointId, baseUrl, {
+            environment: options.environment,
+          });
           results.push(result);
         } catch (error) {
-          adminLogger.error('Failed to test endpoint in collection', {
+          adminLogger.error("Failed to test endpoint in collection", {
             collectionId,
             endpointId,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }
@@ -589,10 +637,10 @@ export class ApiTestingService {
   /**
    * Create mock response
    */
-  static createMockResponse(mock: Omit<MockResponse, 'id'>): MockResponse {
+  static createMockResponse(mock: Omit<MockResponse, "id">): MockResponse {
     const newMock: MockResponse = {
       ...mock,
-      id: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      id: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     };
 
     this.mockResponses.set(newMock.id, newMock);
@@ -602,44 +650,51 @@ export class ApiTestingService {
   /**
    * Get mock response for request
    */
-  static getMockResponse(endpoint: string, method: string, request: any): MockResponse | null {
+  static getMockResponse(
+    endpoint: string,
+    method: string,
+    request: any
+  ): MockResponse | null {
     for (const mock of this.mockResponses.values()) {
       if (mock.endpoint === endpoint && mock.method === method && mock.active) {
         // Check conditions
         if (mock.conditions && mock.conditions.length > 0) {
-          const conditionsMet = mock.conditions.every(condition => {
+          const conditionsMet = mock.conditions.every((condition) => {
             return this.evaluateCondition(condition, request);
           });
-          
+
           if (!conditionsMet) {
             continue;
           }
         }
-        
+
         return mock;
       }
     }
-    
+
     return null;
   }
 
   /**
    * Evaluate mock condition
    */
-  private static evaluateCondition(condition: MockCondition, request: any): boolean {
+  private static evaluateCondition(
+    condition: MockCondition,
+    request: any
+  ): boolean {
     let value: any;
-    
+
     switch (condition.type) {
-      case 'header':
+      case "header":
         value = request.headers?.[condition.key];
         break;
-      case 'query':
+      case "query":
         value = request.query?.[condition.key];
         break;
-      case 'body':
+      case "body":
         value = request.body?.[condition.key];
         break;
-      case 'path':
+      case "path":
         value = request.params?.[condition.key];
         break;
       default:
@@ -647,13 +702,15 @@ export class ApiTestingService {
     }
 
     switch (condition.operator) {
-      case 'equals':
+      case "equals":
         return value === condition.value;
-      case 'contains':
-        return typeof value === 'string' && value.includes(condition.value);
-      case 'regex':
-        return typeof value === 'string' && new RegExp(condition.value).test(value);
-      case 'exists':
+      case "contains":
+        return typeof value === "string" && value.includes(condition.value);
+      case "regex":
+        return (
+          typeof value === "string" && new RegExp(condition.value).test(value)
+        );
+      case "exists":
         return value !== undefined && value !== null;
       default:
         return false;
@@ -694,28 +751,31 @@ export class ApiTestingService {
 
     if (filters) {
       if (filters.endpoint) {
-        results = results.filter(r => r.endpoint.includes(filters.endpoint!));
+        results = results.filter((r) => r.endpoint.includes(filters.endpoint!));
       }
       if (filters.method) {
-        results = results.filter(r => r.method === filters.method);
+        results = results.filter((r) => r.method === filters.method);
       }
       if (filters.success !== undefined) {
-        results = results.filter(r => r.success === filters.success);
+        results = results.filter((r) => r.success === filters.success);
       }
       if (filters.limit !== undefined && filters.limit >= 0) {
         results = results.slice(0, filters.limit);
       }
     }
 
-    return results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return results.sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    );
   }
 
   /**
    * Get usage analytics
    */
   static getUsageAnalytics(): ApiUsageAnalytics[] {
-    return Array.from(this.usageAnalytics.values())
-      .sort((a, b) => b.popularityScore - a.popularityScore);
+    return Array.from(this.usageAnalytics.values()).sort(
+      (a, b) => b.popularityScore - a.popularityScore
+    );
   }
 
   /**
@@ -737,7 +797,7 @@ export class ApiTestingService {
    */
   static clearTestResults() {
     this.testResults = [];
-    this.endpoints.forEach(endpoint => {
+    this.endpoints.forEach((endpoint) => {
       endpoint.testResults = [];
     });
   }
@@ -745,15 +805,15 @@ export class ApiTestingService {
   /**
    * Export API documentation
    */
-  static exportDocumentation(format: 'openapi' | 'postman' | 'insomnia'): any {
+  static exportDocumentation(format: "openapi" | "postman" | "insomnia"): any {
     const endpoints = this.getAllEndpoints();
 
     switch (format) {
-      case 'openapi':
+      case "openapi":
         return this.generateOpenApiSpec(endpoints);
-      case 'postman':
+      case "postman":
         return this.generatePostmanCollection(endpoints);
-      case 'insomnia':
+      case "insomnia":
         return this.generateInsomniaCollection(endpoints);
       default:
         throw new Error(`Unsupported format: ${format}`);
@@ -765,31 +825,31 @@ export class ApiTestingService {
    */
   private static generateOpenApiSpec(endpoints: ApiEndpoint[]): any {
     const spec = {
-      openapi: '3.0.0',
+      openapi: "3.0.0",
       info: {
-        title: 'Mobile Mafia Game API',
-        version: '1.0.0',
-        description: 'API documentation for Mobile Mafia Game'
+        title: "Mobile Mafia Game API",
+        version: "1.0.0",
+        description: "API documentation for Mobile Mafia Game",
       },
       servers: [
         {
-          url: 'http://localhost:3000',
-          description: 'Development server'
-        }
+          url: "http://localhost:3000",
+          description: "Development server",
+        },
       ],
       paths: {} as any,
       components: {
         securitySchemes: {
           bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT'
-          }
-        }
-      }
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+          },
+        },
+      },
     };
 
-    endpoints.forEach(endpoint => {
+    endpoints.forEach((endpoint) => {
       if (!spec.paths[endpoint.path]) {
         spec.paths[endpoint.path] = {};
       }
@@ -797,28 +857,28 @@ export class ApiTestingService {
       spec.paths[endpoint.path][endpoint.method.toLowerCase()] = {
         summary: endpoint.description,
         tags: endpoint.tags,
-        parameters: endpoint.parameters?.map(param => ({
+        parameters: endpoint.parameters?.map((param) => ({
           name: param.name,
-          in: param.name.startsWith(':') ? 'path' : 'query',
+          in: param.name.startsWith(":") ? "path" : "query",
           required: param.required,
           description: param.description,
           schema: {
-            type: param.type
+            type: param.type,
           },
-          example: param.example
+          example: param.example,
         })),
         responses: endpoint.responses?.reduce((acc, response) => {
           acc[response.statusCode] = {
             description: response.description,
             content: {
-              'application/json': {
-                example: response.example
-              }
-            }
+              "application/json": {
+                example: response.example,
+              },
+            },
           };
           return acc;
         }, {} as any),
-        security: endpoint.requiresAuth ? [{ bearerAuth: [] }] : undefined
+        security: endpoint.requiresAuth ? [{ bearerAuth: [] }] : undefined,
       };
     });
 
@@ -831,39 +891,42 @@ export class ApiTestingService {
   private static generatePostmanCollection(endpoints: ApiEndpoint[]): any {
     return {
       info: {
-        name: 'Mobile Mafia Game API',
-        description: 'API collection for Mobile Mafia Game',
-        schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+        name: "Mobile Mafia Game API",
+        description: "API collection for Mobile Mafia Game",
+        schema:
+          "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
       },
-      item: endpoints.map(endpoint => ({
+      item: endpoints.map((endpoint) => ({
         name: `${endpoint.method} ${endpoint.path}`,
         request: {
           method: endpoint.method,
-          header: endpoint.requiresAuth ? [
-            {
-              key: 'Authorization',
-              value: 'Bearer {{token}}',
-              type: 'text'
-            }
-          ] : [],
+          header: endpoint.requiresAuth
+            ? [
+                {
+                  key: "Authorization",
+                  value: "Bearer {{token}}",
+                  type: "text",
+                },
+              ]
+            : [],
           url: {
             raw: `{{baseUrl}}${endpoint.path}`,
-            host: ['{{baseUrl}}'],
-            path: endpoint.path.split('/').filter(p => p)
+            host: ["{{baseUrl}}"],
+            path: endpoint.path.split("/").filter((p) => p),
           },
-          description: endpoint.description
-        }
+          description: endpoint.description,
+        },
       })),
       variable: [
         {
-          key: 'baseUrl',
-          value: 'http://localhost:3000'
+          key: "baseUrl",
+          value: "http://localhost:3000",
         },
         {
-          key: 'token',
-          value: ''
-        }
-      ]
+          key: "token",
+          value: "",
+        },
+      ],
     };
   }
 
@@ -872,42 +935,44 @@ export class ApiTestingService {
    */
   private static generateInsomniaCollection(endpoints: ApiEndpoint[]): any {
     return {
-      _type: 'export',
+      _type: "export",
       __export_format: 4,
       __export_date: new Date().toISOString(),
-      __export_source: 'insomnia.desktop.app:v2023.5.8',
+      __export_source: "insomnia.desktop.app:v2023.5.8",
       resources: [
         {
-          _id: 'wrk_base',
-          _type: 'workspace',
-          name: 'Mobile Mafia Game API',
-          description: 'API workspace for Mobile Mafia Game'
+          _id: "wrk_base",
+          _type: "workspace",
+          name: "Mobile Mafia Game API",
+          description: "API workspace for Mobile Mafia Game",
         },
         {
-          _id: 'env_base',
-          _type: 'environment',
-          name: 'Base Environment',
+          _id: "env_base",
+          _type: "environment",
+          name: "Base Environment",
           data: {
-            baseUrl: 'http://localhost:3000',
-            token: ''
-          }
+            baseUrl: "http://localhost:3000",
+            token: "",
+          },
         },
         ...endpoints.map((endpoint, index) => ({
           _id: `req_${index}`,
-          _type: 'request',
+          _type: "request",
           name: `${endpoint.method} ${endpoint.path}`,
           method: endpoint.method,
           url: `{{ _.baseUrl }}${endpoint.path}`,
-          headers: endpoint.requiresAuth ? [
-            {
-              name: 'Authorization',
-              value: 'Bearer {{ _.token }}'
-            }
-          ] : [],
+          headers: endpoint.requiresAuth
+            ? [
+                {
+                  name: "Authorization",
+                  value: "Bearer {{ _.token }}",
+                },
+              ]
+            : [],
           description: endpoint.description,
-          parentId: 'wrk_base'
-        }))
-      ]
+          parentId: "wrk_base",
+        })),
+      ],
     };
   }
 }

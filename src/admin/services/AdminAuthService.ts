@@ -1,13 +1,18 @@
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import { Types } from 'mongoose';
-import { SuperUser, ISuperUser, Permission, SuperUserStatus } from '../models/SuperUser';
-import { AdminSession } from '../models/AdminSession';
-import { EmailApproval } from '../models/EmailApproval';
-import { AdminLog } from '../models/AdminLog';
-import { adminLogger, logAdminSecurity } from '../config/logger';
-import { AdminOperationalError } from '../middleware/errorHandler';
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { Types } from "mongoose";
+import {
+  SuperUser,
+  ISuperUser,
+  Permission,
+  SuperUserStatus,
+} from "../models/SuperUser";
+import { AdminSession } from "../models/AdminSession";
+import { EmailApproval } from "../models/EmailApproval";
+import { AdminLog } from "../models/AdminLog";
+import { adminLogger, logAdminSecurity } from "../config/logger";
+import { AdminOperationalError } from "../middleware/errorHandler";
 
 // JWT payload interface for admin users
 export interface AdminJWTPayload {
@@ -67,22 +72,30 @@ export interface PasswordPolicy {
 }
 
 export class AdminAuthService {
-  private static get ACCESS_TOKEN_SECRET() { 
-    return process.env.ADMIN_JWT_ACCESS_SECRET || process.env.JWT_ACCESS_SECRET || 'admin-access-secret-key'; 
+  private static get ACCESS_TOKEN_SECRET() {
+    return (
+      process.env.ADMIN_JWT_ACCESS_SECRET ||
+      process.env.JWT_ACCESS_SECRET ||
+      "admin-access-secret-key"
+    );
   }
-  
-  private static get REFRESH_TOKEN_SECRET() { 
-    return process.env.ADMIN_JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET || 'admin-refresh-secret-key'; 
+
+  private static get REFRESH_TOKEN_SECRET() {
+    return (
+      process.env.ADMIN_JWT_REFRESH_SECRET ||
+      process.env.JWT_REFRESH_SECRET ||
+      "admin-refresh-secret-key"
+    );
   }
-  
-  private static get ACCESS_TOKEN_EXPIRES_IN() { 
-    return process.env.ADMIN_JWT_ACCESS_EXPIRES_IN || '1h'; 
+
+  private static get ACCESS_TOKEN_EXPIRES_IN() {
+    return process.env.ADMIN_JWT_ACCESS_EXPIRES_IN || "1h";
   }
-  
-  private static get REFRESH_TOKEN_EXPIRES_IN() { 
-    return process.env.ADMIN_JWT_REFRESH_EXPIRES_IN || '7d'; 
+
+  private static get REFRESH_TOKEN_EXPIRES_IN() {
+    return process.env.ADMIN_JWT_REFRESH_EXPIRES_IN || "7d";
   }
-  
+
   private static readonly SALT_ROUNDS = 14; // Higher security for admin accounts
   private static readonly MAX_LOGIN_ATTEMPTS = 5;
   private static readonly LOCKOUT_DURATION = 2 * 60 * 60 * 1000; // 2 hours
@@ -97,59 +110,81 @@ export class AdminAuthService {
     requireNumbers: true,
     requireSpecialChars: true,
     forbiddenPatterns: [
-      'password', 'admin', '123456', 'qwerty', 'letmein',
-      'welcome', 'monkey', 'dragon', 'master', 'shadow'
-    ]
+      "password",
+      "admin",
+      "123456",
+      "qwerty",
+      "letmein",
+      "welcome",
+      "monkey",
+      "dragon",
+      "master",
+      "shadow",
+    ],
   };
 
   /**
    * Validate password against security policy
    */
-  static validatePassword(password: string): { isValid: boolean; errors: string[] } {
+  static validatePassword(password: string): {
+    isValid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
     const policy = this.PASSWORD_POLICY;
 
     if (password.length < policy.minLength) {
-      errors.push(`Password must be at least ${policy.minLength} characters long`);
+      errors.push(
+        `Password must be at least ${policy.minLength} characters long`
+      );
     }
 
     if (policy.requireUppercase && !/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter');
+      errors.push("Password must contain at least one uppercase letter");
     }
 
     if (policy.requireLowercase && !/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter');
+      errors.push("Password must contain at least one lowercase letter");
     }
 
     if (policy.requireNumbers && !/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
+      errors.push("Password must contain at least one number");
     }
 
-    if (policy.requireSpecialChars && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Password must contain at least one special character');
+    if (
+      policy.requireSpecialChars &&
+      !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    ) {
+      errors.push("Password must contain at least one special character");
     }
 
     // Check for forbidden patterns
     const lowerPassword = password.toLowerCase();
     for (const pattern of policy.forbiddenPatterns) {
       if (lowerPassword.includes(pattern)) {
-        errors.push(`Password cannot contain common patterns like "${pattern}"`);
+        errors.push(
+          `Password cannot contain common patterns like "${pattern}"`
+        );
       }
     }
 
     // Check for sequential characters
     if (/(.)\1{2,}/.test(password)) {
-      errors.push('Password cannot contain repeated characters');
+      errors.push("Password cannot contain repeated characters");
     }
 
     // Check for sequential patterns
-    if (/(?:abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(password)) {
-      errors.push('Password cannot contain sequential characters');
+    if (
+      /(?:abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(
+        password
+      )
+    ) {
+      errors.push("Password cannot contain sequential characters");
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -163,7 +198,10 @@ export class AdminAuthService {
   /**
    * Compare a plain text password with a hashed password
    */
-  static async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
+  static async comparePassword(
+    password: string,
+    hashedPassword: string
+  ): Promise<boolean> {
     return bcrypt.compare(password, hashedPassword);
   }
 
@@ -173,8 +211,8 @@ export class AdminAuthService {
   static generateAccessToken(payload: AdminJWTPayload): string {
     return jwt.sign(payload, this.ACCESS_TOKEN_SECRET, {
       expiresIn: this.ACCESS_TOKEN_EXPIRES_IN,
-      issuer: 'mafia-game-admin',
-      audience: 'admin-portal'
+      issuer: "mafia-game-admin",
+      audience: "admin-portal",
     } as jwt.SignOptions);
   }
 
@@ -184,8 +222,8 @@ export class AdminAuthService {
   static generateRefreshToken(payload: AdminJWTPayload): string {
     return jwt.sign(payload, this.REFRESH_TOKEN_SECRET, {
       expiresIn: this.REFRESH_TOKEN_EXPIRES_IN,
-      issuer: 'mafia-game-admin',
-      audience: 'admin-portal'
+      issuer: "mafia-game-admin",
+      audience: "admin-portal",
     } as jwt.SignOptions);
   }
 
@@ -195,11 +233,13 @@ export class AdminAuthService {
   static verifyAccessToken(token: string): AdminJWTPayload | null {
     try {
       return jwt.verify(token, this.ACCESS_TOKEN_SECRET, {
-        issuer: 'mafia-game-admin',
-        audience: 'admin-portal'
+        issuer: "mafia-game-admin",
+        audience: "admin-portal",
       }) as AdminJWTPayload;
     } catch (error) {
-      adminLogger.warn('Admin access token verification failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      adminLogger.warn("Admin access token verification failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       return null;
     }
   }
@@ -210,11 +250,13 @@ export class AdminAuthService {
   static verifyRefreshToken(token: string): AdminJWTPayload | null {
     try {
       return jwt.verify(token, this.REFRESH_TOKEN_SECRET, {
-        issuer: 'mafia-game-admin',
-        audience: 'admin-portal'
+        issuer: "mafia-game-admin",
+        audience: "admin-portal",
       }) as AdminJWTPayload;
     } catch (error) {
-      adminLogger.warn('Admin refresh token verification failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      adminLogger.warn("Admin refresh token verification failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       return null;
     }
   }
@@ -222,44 +264,62 @@ export class AdminAuthService {
   /**
    * Register a new admin user with approval workflow
    */
-  static async register(data: AdminRegistrationData, requestIp?: string): Promise<AdminAuthResult> {
+  static async register(
+    data: AdminRegistrationData,
+    requestIp?: string
+  ): Promise<AdminAuthResult> {
     try {
       // Validate input
       if (!data.username || data.username.length < 3) {
-        return { success: false, message: 'Username must be at least 3 characters long' };
+        return {
+          success: false,
+          message: "Username must be at least 3 characters long",
+        };
       }
 
       if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-        return { success: false, message: 'Valid email address is required' };
+        return { success: false, message: "Valid email address is required" };
       }
 
       // Validate password
       const passwordValidation = this.validatePassword(data.password);
       if (!passwordValidation.isValid) {
-        return { 
-          success: false, 
-          message: 'Password does not meet security requirements: ' + passwordValidation.errors.join(', ')
+        return {
+          success: false,
+          message:
+            "Password does not meet security requirements: " +
+            passwordValidation.errors.join(", "),
         };
       }
 
       // Check if username already exists
       const existingUser = await SuperUser.findOne({ username: data.username });
       if (existingUser) {
-        logAdminSecurity('Admin registration attempt with existing username', requestIp || 'unknown', '', {
-          username: data.username,
-          email: data.email
-        });
-        return { success: false, message: 'Username already exists' };
+        logAdminSecurity(
+          "Admin registration attempt with existing username",
+          requestIp || "unknown",
+          "",
+          {
+            username: data.username,
+            email: data.email,
+          }
+        );
+        return { success: false, message: "Username already exists" };
       }
 
       // Check if email already exists
       const existingEmail = await SuperUser.findOne({ email: data.email });
       if (existingEmail) {
-        logAdminSecurity('Admin registration attempt with existing email', requestIp || 'unknown', '', {
-          username: data.username,
-          email: data.email
-        });
-        return { success: false, message: 'Email already exists' };
+        logAdminSecurity(
+          "Admin registration attempt with existing email",
+          requestIp || "unknown",
+          "",
+          {
+            username: data.username,
+            email: data.email,
+          }
+        );
+        return { success: false, message: "Email already exists" };
       }
 
       // Hash password
@@ -273,22 +333,22 @@ export class AdminAuthService {
         firstName: data.firstName,
         lastName: data.lastName,
         permissions: data.requestedPermissions,
-        status: SuperUserStatus.PENDING
+        status: SuperUserStatus.PENDING,
       });
 
       await adminUser.save();
 
       // Create email approval record using the correct structure
-      const approvalToken = crypto.randomBytes(32).toString('hex');
-      
+      const approvalToken = crypto.randomBytes(32).toString("hex");
+
       // Find existing super admins to be approvers
-      const superAdmins = await SuperUser.find({ 
+      const superAdmins = await SuperUser.find({
         permissions: Permission.SUPER_ADMIN,
-        status: SuperUserStatus.APPROVED 
+        status: SuperUserStatus.APPROVED,
       });
-      
-      const approverIds = superAdmins.map(admin => admin._id);
-      
+
+      const approverIds = superAdmins.map((admin) => admin._id);
+
       // If no super admins exist, create a basic approval record
       if (approverIds.length === 0) {
         // For the first admin, we'll need manual approval
@@ -296,7 +356,7 @@ export class AdminAuthService {
       }
 
       const emailApproval = await EmailApproval.create({
-        type: 'super_user_registration',
+        type: "super_user_registration",
         title: `Admin Registration Request: ${data.username}`,
         description: `Registration request for admin user ${data.username} (${data.email}). Justification: ${data.justification}`,
         requestedBy: adminUser._id,
@@ -308,32 +368,32 @@ export class AdminAuthService {
             email: data.email,
             firstName: data.firstName,
             lastName: data.lastName,
-            requestedPermissions: data.requestedPermissions
-          }
+            requestedPermissions: data.requestedPermissions,
+          },
         },
         approvalToken: approvalToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       });
 
       // Log admin registration attempt
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_registration_request',
+        action: "admin_registration_request",
         details: {
           username: data.username,
           email: data.email,
           requestedPermissions: data.requestedPermissions,
-          justification: data.justification
+          justification: data.justification,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin registration request created', {
+      adminLogger.info("Admin registration request created", {
         userId: adminUser._id.toString(),
         username: data.username,
         email: data.email,
-        requestedPermissions: data.requestedPermissions
+        requestedPermissions: data.requestedPermissions,
       });
 
       // TODO: Send approval email to existing super admins
@@ -341,103 +401,138 @@ export class AdminAuthService {
 
       return {
         success: true,
-        message: 'Registration request submitted successfully. Your account will be reviewed by an administrator.',
-        requiresApproval: true
+        message:
+          "Registration request submitted successfully. Your account will be reviewed by an administrator.",
+        requiresApproval: true,
       };
-
     } catch (error) {
-      adminLogger.error('Admin registration error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin registration error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Registration failed due to server error' };
+      return {
+        success: false,
+        message: "Registration failed due to server error",
+      };
     }
   }
 
   /**
    * Login an admin user
    */
-  static async login(credentials: AdminLoginCredentials, requestIp?: string, userAgent?: string): Promise<AdminAuthResult> {
+  static async login(
+    credentials: AdminLoginCredentials,
+    requestIp?: string,
+    userAgent?: string
+  ): Promise<AdminAuthResult> {
     try {
       // Validate input
       if (!credentials.password) {
-        return { success: false, message: 'Password is required' };
+        return { success: false, message: "Password is required" };
       }
 
       if (!credentials.username && !credentials.email) {
-        return { success: false, message: 'Username or email is required' };
+        return { success: false, message: "Username or email is required" };
       }
 
       // Find admin user by username or email
-      const query = credentials.username 
+      const query = credentials.username
         ? { username: credentials.username }
         : { email: credentials.email };
 
-      const adminUser = await SuperUser.findOne(query).select('+password +refreshTokens +loginAttempts +lockUntil');
-      
+      const adminUser = await SuperUser.findOne(query).select(
+        "+password +refreshTokens +loginAttempts +lockUntil"
+      );
+
       if (!adminUser) {
-        logAdminSecurity('Admin login attempt with non-existent user', requestIp || 'unknown', userAgent || '', {
-          username: credentials.username,
-          email: credentials.email
-        });
-        return { success: false, message: 'Invalid credentials' };
+        logAdminSecurity(
+          "Admin login attempt with non-existent user",
+          requestIp || "unknown",
+          userAgent || "",
+          {
+            username: credentials.username,
+            email: credentials.email,
+          }
+        );
+        return { success: false, message: "Invalid credentials" };
       }
 
       // Check if account is locked
       if (adminUser.isLocked) {
-        logAdminSecurity('Admin login attempt on locked account', requestIp || 'unknown', userAgent || '', {
-          userId: adminUser._id.toString(),
-          username: adminUser.username,
-          lockUntil: adminUser.lockUntil
-        });
-        return { 
-          success: false, 
-          message: `Account is locked until ${adminUser.lockUntil?.toISOString()}. Please try again later or contact support.` 
+        logAdminSecurity(
+          "Admin login attempt on locked account",
+          requestIp || "unknown",
+          userAgent || "",
+          {
+            userId: adminUser._id.toString(),
+            username: adminUser.username,
+            lockUntil: adminUser.lockUntil,
+          }
+        );
+        return {
+          success: false,
+          message: `Account is locked until ${adminUser.lockUntil?.toISOString()}. Please try again later or contact support.`,
         };
       }
 
       // Check account status
       if (adminUser.status !== SuperUserStatus.APPROVED) {
-        logAdminSecurity('Admin login attempt with non-approved account', requestIp || 'unknown', userAgent || '', {
-          userId: adminUser._id.toString(),
-          username: adminUser.username,
-          status: adminUser.status
-        });
-        
-        let message = 'Account access denied';
+        logAdminSecurity(
+          "Admin login attempt with non-approved account",
+          requestIp || "unknown",
+          userAgent || "",
+          {
+            userId: adminUser._id.toString(),
+            username: adminUser.username,
+            status: adminUser.status,
+          }
+        );
+
+        let message = "Account access denied";
         switch (adminUser.status) {
           case SuperUserStatus.PENDING:
-            message = 'Account is pending approval';
+            message = "Account is pending approval";
             break;
           case SuperUserStatus.SUSPENDED:
-            message = 'Account has been suspended';
+            message = "Account has been suspended";
             break;
           case SuperUserStatus.REJECTED:
-            message = 'Account registration was rejected';
+            message = "Account registration was rejected";
             break;
         }
-        
+
         return { success: false, message };
       }
 
       // Verify password
-      const isPasswordValid = await this.comparePassword(credentials.password, adminUser.password);
+      const isPasswordValid = await this.comparePassword(
+        credentials.password,
+        adminUser.password
+      );
       if (!isPasswordValid) {
         // Increment login attempts
         await adminUser.incrementLoginAttempts();
-        
-        logAdminSecurity('Admin login attempt with invalid password', requestIp || 'unknown', userAgent || '', {
-          userId: adminUser._id.toString(),
-          username: adminUser.username,
-          loginAttempts: adminUser.loginAttempts + 1
-        });
-        
-        return { success: false, message: 'Invalid credentials' };
+
+        logAdminSecurity(
+          "Admin login attempt with invalid password",
+          requestIp || "unknown",
+          userAgent || "",
+          {
+            userId: adminUser._id.toString(),
+            username: adminUser.username,
+            loginAttempts: adminUser.loginAttempts + 1,
+          }
+        );
+
+        return { success: false, message: "Invalid credentials" };
       }
 
       // TODO: Implement 2FA verification if enabled
       if (adminUser.twoFactorEnabled && !credentials.twoFactorCode) {
-        return { success: false, message: 'Two-factor authentication code required' };
+        return {
+          success: false,
+          message: "Two-factor authentication code required",
+        };
       }
 
       // Reset login attempts on successful login
@@ -452,13 +547,13 @@ export class AdminAuthService {
         email: adminUser.email,
         permissions: adminUser.permissions,
         status: adminUser.status,
-        isAdmin: true
+        isAdmin: true,
       };
 
       const accessToken = this.generateAccessToken(tokenPayload);
       const refreshToken = this.generateRefreshToken({
         ...tokenPayload,
-        tokenId: Date.now() + Math.random().toString(36).substring(2, 9)
+        tokenId: Date.now() + Math.random().toString(36).substring(2, 9),
       } as AdminJWTPayload);
 
       // Store refresh token
@@ -466,7 +561,7 @@ export class AdminAuthService {
         adminUser.refreshTokens = [];
       }
       adminUser.refreshTokens.push(refreshToken);
-      
+
       // Limit number of refresh tokens (keep only last 5)
       if (adminUser.refreshTokens.length > 5) {
         adminUser.refreshTokens = adminUser.refreshTokens.slice(-5);
@@ -479,29 +574,32 @@ export class AdminAuthService {
       // Create admin session
       await AdminSession.create({
         userId: adminUser._id,
-        sessionToken: refreshToken,
-        ipAddress: requestIp || 'unknown',
-        userAgent: userAgent || 'unknown',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        sessionToken: accessToken,
+        refreshToken: refreshToken,
+        ipAddress: requestIp || "unknown",
+        userAgent: userAgent || "unknown",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       });
 
       // Log successful login
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_login_success',
+        level: "info",
+        action: "auth:login",
+        message: `Admin user ${adminUser.username} logged in successfully`,
         details: {
           username: adminUser.username,
-          permissions: adminUser.permissions
+          permissions: adminUser.permissions,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin login successful', {
+      adminLogger.info("Admin login successful", {
         userId: adminUser._id.toString(),
         username: adminUser.username,
         permissions: adminUser.permissions,
-        ip: requestIp
+        ip: requestIp,
       });
 
       // Remove sensitive data from response
@@ -514,42 +612,55 @@ export class AdminAuthService {
         user: userResponse as ISuperUser,
         accessToken,
         refreshToken,
-        message: 'Login successful'
+        message: "Login successful",
       };
-
     } catch (error) {
-      adminLogger.error('Admin login error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin login error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Login failed due to server error' };
+      return { success: false, message: "Login failed due to server error" };
     }
   }
 
   /**
    * Refresh access token using refresh token
    */
-  static async refreshToken(refreshToken: string, requestIp?: string): Promise<AdminAuthResult> {
+  static async refreshToken(
+    refreshToken: string,
+    requestIp?: string
+  ): Promise<AdminAuthResult> {
     try {
       // Verify refresh token
       const payload = this.verifyRefreshToken(refreshToken);
       if (!payload) {
-        return { success: false, message: 'Invalid refresh token' };
+        return { success: false, message: "Invalid refresh token" };
       }
 
       // Find admin user and verify refresh token exists
-      const adminUser = await SuperUser.findById(payload.userId).select('+refreshTokens');
-      if (!adminUser || !adminUser.refreshTokens || !adminUser.refreshTokens.includes(refreshToken)) {
-        logAdminSecurity('Admin token refresh attempt with invalid token', requestIp || 'unknown', '', {
-          userId: payload.userId,
-          username: payload.username
-        });
-        return { success: false, message: 'Invalid refresh token' };
+      const adminUser = await SuperUser.findById(payload.userId).select(
+        "+refreshTokens"
+      );
+      if (
+        !adminUser ||
+        !adminUser.refreshTokens ||
+        !adminUser.refreshTokens.includes(refreshToken)
+      ) {
+        logAdminSecurity(
+          "Admin token refresh attempt with invalid token",
+          requestIp || "unknown",
+          "",
+          {
+            userId: payload.userId,
+            username: payload.username,
+          }
+        );
+        return { success: false, message: "Invalid refresh token" };
       }
 
       // Check account status
       if (adminUser.status !== SuperUserStatus.APPROVED) {
-        return { success: false, message: 'Account access denied' };
+        return { success: false, message: "Account access denied" };
       }
 
       // Generate new tokens
@@ -559,37 +670,39 @@ export class AdminAuthService {
         email: adminUser.email,
         permissions: adminUser.permissions,
         status: adminUser.status,
-        isAdmin: true
+        isAdmin: true,
       };
 
       const newAccessToken = this.generateAccessToken(newTokenPayload);
       const newRefreshToken = this.generateRefreshToken({
         ...newTokenPayload,
-        tokenId: Date.now() + Math.random().toString(36).substring(2, 9)
+        tokenId: Date.now() + Math.random().toString(36).substring(2, 9),
       } as AdminJWTPayload);
 
       // Replace old refresh token with new one
-      adminUser.refreshTokens = adminUser.refreshTokens.filter(token => token !== refreshToken);
+      adminUser.refreshTokens = adminUser.refreshTokens.filter(
+        (token) => token !== refreshToken
+      );
       adminUser.refreshTokens.push(newRefreshToken);
       await adminUser.save();
 
       // Update admin session
       await AdminSession.findOneAndUpdate(
         { sessionToken: refreshToken },
-        { 
+        {
           sessionToken: newRefreshToken,
           lastActivity: new Date(),
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         }
       );
 
       // Log token refresh
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_token_refresh',
+        action: "admin_token_refresh",
         details: { username: adminUser.username },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
       // Remove sensitive data from response
@@ -602,33 +715,39 @@ export class AdminAuthService {
         user: userResponse as ISuperUser,
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
-        message: 'Token refreshed successfully'
+        message: "Token refreshed successfully",
       };
-
     } catch (error) {
-      adminLogger.error('Admin token refresh error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin token refresh error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Token refresh failed' };
+      return { success: false, message: "Token refresh failed" };
     }
   }
 
   /**
    * Logout an admin user (invalidate refresh token)
    */
-  static async logout(refreshToken: string, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async logout(
+    refreshToken: string,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       // Verify refresh token
       const payload = this.verifyRefreshToken(refreshToken);
       if (!payload) {
-        return { success: false, message: 'Invalid refresh token' };
+        return { success: false, message: "Invalid refresh token" };
       }
 
       // Find admin user and remove refresh token
-      const adminUser = await SuperUser.findById(payload.userId).select('+refreshTokens');
+      const adminUser = await SuperUser.findById(payload.userId).select(
+        "+refreshTokens"
+      );
       if (adminUser && adminUser.refreshTokens) {
-        adminUser.refreshTokens = adminUser.refreshTokens.filter(token => token !== refreshToken);
+        adminUser.refreshTokens = adminUser.refreshTokens.filter(
+          (token) => token !== refreshToken
+        );
         await adminUser.save();
       }
 
@@ -639,34 +758,36 @@ export class AdminAuthService {
       if (adminUser) {
         await AdminLog.create({
           userId: adminUser._id,
-          action: 'admin_logout',
+          action: "admin_logout",
           details: { username: adminUser.username },
-          ipAddress: requestIp || 'unknown',
-          timestamp: new Date()
+          ipAddress: requestIp || "unknown",
+          timestamp: new Date(),
         });
 
-        adminLogger.info('Admin logout successful', {
+        adminLogger.info("Admin logout successful", {
           userId: adminUser._id.toString(),
           username: adminUser.username,
-          ip: requestIp
+          ip: requestIp,
         });
       }
 
-      return { success: true, message: 'Logout successful' };
-
+      return { success: true, message: "Logout successful" };
     } catch (error) {
-      adminLogger.error('Admin logout error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin logout error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Logout failed' };
+      return { success: false, message: "Logout failed" };
     }
   }
 
   /**
    * Logout from all devices (invalidate all refresh tokens)
    */
-  static async logoutAll(userId: string, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async logoutAll(
+    userId: string,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const adminUser = await SuperUser.findById(userId);
       if (adminUser) {
@@ -679,44 +800,52 @@ export class AdminAuthService {
         // Log logout all
         await AdminLog.create({
           userId: adminUser._id,
-          action: 'admin_logout_all',
+          action: "admin_logout_all",
           details: { username: adminUser.username },
-          ipAddress: requestIp || 'unknown',
-          timestamp: new Date()
+          ipAddress: requestIp || "unknown",
+          timestamp: new Date(),
         });
 
-        adminLogger.info('Admin logout all successful', {
+        adminLogger.info("Admin logout all successful", {
           userId: adminUser._id.toString(),
           username: adminUser.username,
-          ip: requestIp
+          ip: requestIp,
         });
       }
 
-      return { success: true, message: 'Logged out from all devices' };
-
+      return { success: true, message: "Logged out from all devices" };
     } catch (error) {
-      adminLogger.error('Admin logout all error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin logout all error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Logout from all devices failed' };
+      return { success: false, message: "Logout from all devices failed" };
     }
   }
 
   /**
    * Initiate password reset
    */
-  static async initiatePasswordReset(data: PasswordResetData, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async initiatePasswordReset(
+    data: PasswordResetData,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const adminUser = await SuperUser.findOne({ email: data.email });
       if (!adminUser) {
         // Don't reveal if email exists or not
-        return { success: true, message: 'If the email exists, a password reset link has been sent' };
+        return {
+          success: true,
+          message: "If the email exists, a password reset link has been sent",
+        };
       }
 
       // Generate reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
 
       // Set reset token and expiration (1 hour)
       adminUser.passwordResetToken = resetTokenHash;
@@ -726,61 +855,71 @@ export class AdminAuthService {
       // Log password reset request
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_password_reset_request',
-        details: { 
+        action: "admin_password_reset_request",
+        details: {
           username: adminUser.username,
-          email: adminUser.email
+          email: adminUser.email,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin password reset requested', {
+      adminLogger.info("Admin password reset requested", {
         userId: adminUser._id.toString(),
         username: adminUser.username,
         email: adminUser.email,
-        ip: requestIp
+        ip: requestIp,
       });
 
       // TODO: Send password reset email
       // This would be implemented with the email service
 
-      return { success: true, message: 'If the email exists, a password reset link has been sent' };
-
+      return {
+        success: true,
+        message: "If the email exists, a password reset link has been sent",
+      };
     } catch (error) {
-      adminLogger.error('Admin password reset initiation error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin password reset initiation error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Password reset request failed' };
+      return { success: false, message: "Password reset request failed" };
     }
   }
 
   /**
    * Confirm password reset
    */
-  static async confirmPasswordReset(data: PasswordResetConfirmData, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async confirmPasswordReset(
+    data: PasswordResetConfirmData,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       // Validate new password
       const passwordValidation = this.validatePassword(data.newPassword);
       if (!passwordValidation.isValid) {
-        return { 
-          success: false, 
-          message: 'Password does not meet security requirements: ' + passwordValidation.errors.join(', ')
+        return {
+          success: false,
+          message:
+            "Password does not meet security requirements: " +
+            passwordValidation.errors.join(", "),
         };
       }
 
       // Hash the token to compare with stored hash
-      const resetTokenHash = crypto.createHash('sha256').update(data.token).digest('hex');
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(data.token)
+        .digest("hex");
 
       // Find user with valid reset token
       const adminUser = await SuperUser.findOne({
         passwordResetToken: resetTokenHash,
-        passwordResetExpires: { $gt: new Date() }
-      }).select('+passwordResetToken +passwordResetExpires +refreshTokens');
+        passwordResetExpires: { $gt: new Date() },
+      }).select("+passwordResetToken +passwordResetExpires +refreshTokens");
 
       if (!adminUser) {
-        return { success: false, message: 'Invalid or expired reset token' };
+        return { success: false, message: "Invalid or expired reset token" };
       }
 
       // Hash new password
@@ -790,10 +929,10 @@ export class AdminAuthService {
       adminUser.password = hashedPassword;
       adminUser.passwordResetToken = undefined;
       adminUser.passwordResetExpires = undefined;
-      
+
       // Invalidate all refresh tokens for security
       adminUser.refreshTokens = [];
-      
+
       await adminUser.save();
 
       // Remove all admin sessions
@@ -802,30 +941,33 @@ export class AdminAuthService {
       // Log password reset completion
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_password_reset_complete',
-        details: { 
+        action: "admin_password_reset_complete",
+        details: {
           username: adminUser.username,
-          email: adminUser.email
+          email: adminUser.email,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin password reset completed', {
+      adminLogger.info("Admin password reset completed", {
         userId: adminUser._id.toString(),
         username: adminUser.username,
         email: adminUser.email,
-        ip: requestIp
+        ip: requestIp,
       });
 
-      return { success: true, message: 'Password reset successful. Please log in with your new password.' };
-
+      return {
+        success: true,
+        message:
+          "Password reset successful. Please log in with your new password.",
+      };
     } catch (error) {
-      adminLogger.error('Admin password reset confirmation error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin password reset confirmation error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Password reset failed' };
+      return { success: false, message: "Password reset failed" };
     }
   }
 
@@ -836,9 +978,9 @@ export class AdminAuthService {
     try {
       return await SuperUser.findById(userId);
     } catch (error) {
-      adminLogger.error('Get admin user error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId
+      adminLogger.error("Get admin user error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        userId,
       });
       return null;
     }
@@ -847,15 +989,22 @@ export class AdminAuthService {
   /**
    * Approve admin user registration
    */
-  static async approveRegistration(userId: string, approverId: string, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async approveRegistration(
+    userId: string,
+    approverId: string,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const adminUser = await SuperUser.findById(userId);
       if (!adminUser) {
-        return { success: false, message: 'Admin user not found' };
+        return { success: false, message: "Admin user not found" };
       }
 
       if (adminUser.status !== SuperUserStatus.PENDING) {
-        return { success: false, message: 'Admin user is not in pending status' };
+        return {
+          success: false,
+          message: "Admin user is not in pending status",
+        };
       }
 
       // Update status to approved
@@ -865,57 +1014,70 @@ export class AdminAuthService {
       await adminUser.save();
 
       // Update email approval record by approving it
-      const emailApproval = await EmailApproval.findOne({ 
-        'data.userData.email': adminUser.email,
-        type: 'super_user_registration' 
+      const emailApproval = await EmailApproval.findOne({
+        "data.userData.email": adminUser.email,
+        type: "super_user_registration",
       });
-      
+
       if (emailApproval) {
-        await emailApproval.approve(new Types.ObjectId(approverId), 'Registration approved');
+        await emailApproval.approve(
+          new Types.ObjectId(approverId),
+          "Registration approved"
+        );
       }
 
       // Log approval
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_registration_approved',
-        details: { 
+        action: "admin_registration_approved",
+        details: {
           username: adminUser.username,
-          approvedBy: approverId
+          approvedBy: approverId,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin registration approved', {
+      adminLogger.info("Admin registration approved", {
         userId: adminUser._id.toString(),
         username: adminUser.username,
         approvedBy: approverId,
-        ip: requestIp
+        ip: requestIp,
       });
 
-      return { success: true, message: 'Admin registration approved successfully' };
-
+      return {
+        success: true,
+        message: "Admin registration approved successfully",
+      };
     } catch (error) {
-      adminLogger.error('Admin registration approval error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin registration approval error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Registration approval failed' };
+      return { success: false, message: "Registration approval failed" };
     }
   }
 
   /**
    * Reject admin user registration
    */
-  static async rejectRegistration(userId: string, approverId: string, reason: string, requestIp?: string): Promise<{ success: boolean; message: string }> {
+  static async rejectRegistration(
+    userId: string,
+    approverId: string,
+    reason: string,
+    requestIp?: string
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const adminUser = await SuperUser.findById(userId);
       if (!adminUser) {
-        return { success: false, message: 'Admin user not found' };
+        return { success: false, message: "Admin user not found" };
       }
 
       if (adminUser.status !== SuperUserStatus.PENDING) {
-        return { success: false, message: 'Admin user is not in pending status' };
+        return {
+          success: false,
+          message: "Admin user is not in pending status",
+        };
       }
 
       // Update status to rejected
@@ -923,11 +1085,11 @@ export class AdminAuthService {
       await adminUser.save();
 
       // Update email approval record by rejecting it
-      const emailApproval = await EmailApproval.findOne({ 
-        'data.userData.email': adminUser.email,
-        type: 'super_user_registration' 
+      const emailApproval = await EmailApproval.findOne({
+        "data.userData.email": adminUser.email,
+        type: "super_user_registration",
       });
-      
+
       if (emailApproval) {
         await emailApproval.reject(new Types.ObjectId(approverId), reason);
       }
@@ -935,32 +1097,34 @@ export class AdminAuthService {
       // Log rejection
       await AdminLog.create({
         userId: adminUser._id,
-        action: 'admin_registration_rejected',
-        details: { 
+        action: "admin_registration_rejected",
+        details: {
           username: adminUser.username,
           rejectedBy: approverId,
-          reason: reason
+          reason: reason,
         },
-        ipAddress: requestIp || 'unknown',
-        timestamp: new Date()
+        ipAddress: requestIp || "unknown",
+        timestamp: new Date(),
       });
 
-      adminLogger.info('Admin registration rejected', {
+      adminLogger.info("Admin registration rejected", {
         userId: adminUser._id.toString(),
         username: adminUser.username,
         rejectedBy: approverId,
         reason: reason,
-        ip: requestIp
+        ip: requestIp,
       });
 
-      return { success: true, message: 'Admin registration rejected successfully' };
-
+      return {
+        success: true,
+        message: "Admin registration rejected successfully",
+      };
     } catch (error) {
-      adminLogger.error('Admin registration rejection error', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      adminLogger.error("Admin registration rejection error", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      return { success: false, message: 'Registration rejection failed' };
+      return { success: false, message: "Registration rejection failed" };
     }
   }
 }
