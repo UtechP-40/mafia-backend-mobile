@@ -378,15 +378,16 @@ export class AdminAuthService {
       // Log admin registration attempt
       await AdminLog.create({
         userId: adminUser._id,
-        action: "admin_registration_request",
+        level: "info",
+        action: "admin:create",
+        message: `Admin registration request submitted for ${data.username}`,
         details: {
           username: data.username,
           email: data.email,
           requestedPermissions: data.requestedPermissions,
           justification: data.justification,
         },
-        ipAddress: requestIp || "unknown",
-        timestamp: new Date(),
+        success: true,
       });
 
       adminLogger.info("Admin registration request created", {
@@ -591,8 +592,7 @@ export class AdminAuthService {
           username: adminUser.username,
           permissions: adminUser.permissions,
         },
-        ipAddress: requestIp || "unknown",
-        timestamp: new Date(),
+        success: true,
       });
 
       adminLogger.info("Admin login successful", {
@@ -699,10 +699,11 @@ export class AdminAuthService {
       // Log token refresh
       await AdminLog.create({
         userId: adminUser._id,
-        action: "admin_token_refresh",
+        level: "info",
+        action: "auth:token_refresh",
+        message: `Admin token refreshed for user ${adminUser.username}`,
         details: { username: adminUser.username },
-        ipAddress: requestIp || "unknown",
-        timestamp: new Date(),
+        success: true,
       });
 
       // Remove sensitive data from response
@@ -758,10 +759,11 @@ export class AdminAuthService {
       if (adminUser) {
         await AdminLog.create({
           userId: adminUser._id,
-          action: "admin_logout",
+          level: "info",
+          action: "auth:logout",
+          message: `Admin user ${adminUser.username} logged out successfully`,
           details: { username: adminUser.username },
-          ipAddress: requestIp || "unknown",
-          timestamp: new Date(),
+          success: true,
         });
 
         adminLogger.info("Admin logout successful", {
@@ -800,10 +802,11 @@ export class AdminAuthService {
         // Log logout all
         await AdminLog.create({
           userId: adminUser._id,
-          action: "admin_logout_all",
+          level: "info",
+          action: "auth:logout",
+          message: `Admin user ${adminUser.username} logged out from all devices`,
           details: { username: adminUser.username },
-          ipAddress: requestIp || "unknown",
-          timestamp: new Date(),
+          success: true,
         });
 
         adminLogger.info("Admin logout all successful", {
@@ -855,13 +858,14 @@ export class AdminAuthService {
       // Log password reset request
       await AdminLog.create({
         userId: adminUser._id,
-        action: "admin_password_reset_request",
+        level: "info",
+        action: "auth:password_reset",
+        message: `Password reset requested for admin user ${adminUser.username}`,
         details: {
           username: adminUser.username,
           email: adminUser.email,
         },
-        ipAddress: requestIp || "unknown",
-        timestamp: new Date(),
+        success: true,
       });
 
       adminLogger.info("Admin password reset requested", {
@@ -941,13 +945,14 @@ export class AdminAuthService {
       // Log password reset completion
       await AdminLog.create({
         userId: adminUser._id,
-        action: "admin_password_reset_complete",
+        level: "info",
+        action: "auth:password_reset",
+        message: `Password reset completed for admin user ${adminUser.username}`,
         details: {
           username: adminUser.username,
           email: adminUser.email,
         },
-        ipAddress: requestIp || "unknown",
-        timestamp: new Date(),
+        success: true,
       });
 
       adminLogger.info("Admin password reset completed", {

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { AdminAuthService, AdminLoginCredentials, AdminRegistrationData, PasswordResetData, PasswordResetConfirmData } from '../services/AdminAuthService';
 import { adminAsyncHandler, AdminOperationalError } from '../middleware/errorHandler';
 import { adminLogger, logAdminSecurity } from '../config/logger';
-import { AuthenticatedAdminRequest, requireAdminPermission } from '../middleware/auth';
+import { AuthenticatedAdminRequest, requireAdminPermission, adminAuthMiddleware } from '../middleware/auth';
 import { Permission } from '../models/SuperUser';
 
 const router = Router();
@@ -366,6 +366,7 @@ router.post('/password-reset/confirm',
  * Get current authenticated admin user profile
  */
 router.get('/me', 
+  adminAuthMiddleware,
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response): Promise<void> => {
     const adminUser = req.adminUser;
 
@@ -395,6 +396,7 @@ router.get('/me',
  * Verify if access token is valid
  */
 router.post('/verify-token', 
+  adminAuthMiddleware,
   adminAsyncHandler(async (req: AuthenticatedAdminRequest, res: Response): Promise<void> => {
     const adminUser = req.adminUser;
 

@@ -16,6 +16,7 @@ export enum ActionType {
   LOGOUT = 'auth:logout',
   LOGIN_FAILED = 'auth:login_failed',
   PASSWORD_RESET = 'auth:password_reset',
+  TOKEN_REFRESH = 'auth:token_refresh',
   
   // Database actions
   DATABASE_READ = 'database:read',
